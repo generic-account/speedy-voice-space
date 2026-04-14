@@ -11,6 +11,8 @@ from pyqtgraph.Qt import QtCore, QtWidgets
 from audio import AudioInputManager
 from analysis import AnalysisConfig, AnalysisResult, RealtimeAnalyzer
 
+from statistics import median
+
 
 class AnalysisEmitter(QtCore.QObject):
     result_ready = QtCore.Signal(object)
@@ -41,12 +43,48 @@ class MainWindow(QtWidgets.QWidget):
         self.pitch_history: Deque[float] = deque(maxlen=120)
         self.resonance_history: Deque[float] = deque(maxlen=120)
 
+        self.smoothed_pitch: Optional[float] = None
+        self.smoothed_resonance: Optional[float] = None
+
+        self.raw_pitch_window: Deque[float] = deque(maxlen=5)
+        self.raw_resonance_window: Deque[float] = deque(maxlen=7)
+
         self.emitter = AnalysisEmitter()
         self.emitter.result_ready.connect(self._update_ui)
 
         self._build_ui()
         self._wire_callbacks()
         self._populate_devices()
+
+    def _update_window_size(self, window: Deque[float], new_size: int) -> Deque[float]:
+        return deque(window, maxlen=new_size)
+
+    def _median_filtered_value(
+        self,
+        window: Deque[float],
+        new_value: Optional[float],
+    ) -> Optional[float]:
+        if new_value is None:
+            if not window:
+                return None
+            return float(median(window))
+
+        window.append(float(new_value))
+        if not window:
+            return None
+        return float(median(window))
+
+    def _smooth_value(
+        self,
+        previous: Optional[float],
+        new_value: Optional[float],
+        alpha: float,
+    ) -> Optional[float]:
+        if new_value is None:
+            return previous
+        if previous is None:
+            return new_value
+        return alpha * new_value + (1.0 - alpha) * previous
 
     def _build_ui(self) -> None:
         pg.setConfigOption("background", "w")
@@ -112,6 +150,26 @@ class MainWindow(QtWidgets.QWidget):
         self.pitch_max_box.setRange(80, 1200)
         self.pitch_max_box.setValue(int(self.config.pitch_max_hz))
 
+        self.pitch_smoothing_box = QtWidgets.QDoubleSpinBox()
+        self.pitch_smoothing_box.setRange(0.01, 1.00)
+        self.pitch_smoothing_box.setDecimals(2)
+        self.pitch_smoothing_box.setSingleStep(0.05)
+        self.pitch_smoothing_box.setValue(0.25)
+
+        self.resonance_smoothing_box = QtWidgets.QDoubleSpinBox()
+        self.resonance_smoothing_box.setRange(0.01, 1.00)
+        self.resonance_smoothing_box.setDecimals(2)
+        self.resonance_smoothing_box.setSingleStep(0.05)
+        self.resonance_smoothing_box.setValue(0.15)
+
+        self.pitch_median_window_box = QtWidgets.QSpinBox()
+        self.pitch_median_window_box.setRange(1, 15)
+        self.pitch_median_window_box.setValue(5)
+
+        self.resonance_median_window_box = QtWidgets.QSpinBox()
+        self.resonance_median_window_box.setRange(1, 15)
+        self.resonance_median_window_box.setValue(7)
+
         self.start_button = QtWidgets.QPushButton("Start")
         self.stop_button = QtWidgets.QPushButton("Stop")
         self.apply_button = QtWidgets.QPushButton("Apply Settings")
@@ -129,6 +187,10 @@ class MainWindow(QtWidgets.QWidget):
         form.addRow("RMS Threshold", self.threshold_box)
         form.addRow("Pitch Min (Hz)", self.pitch_min_box)
         form.addRow("Pitch Max (Hz)", self.pitch_max_box)
+        form.addRow("Pitch Median Window", self.pitch_median_window_box)
+        form.addRow("Resonance Median Window", self.resonance_median_window_box)
+        form.addRow("Pitch Smoothing", self.pitch_smoothing_box)
+        form.addRow("Resonance Smoothing", self.resonance_smoothing_box)
         form.addRow(self.start_button)
         form.addRow(self.stop_button)
         form.addRow(self.apply_button)
@@ -196,32 +258,71 @@ class MainWindow(QtWidgets.QWidget):
         self.rms_label.setText(f"{result.rms:.4f}")
         self.voice_label.setText("Yes" if result.voiced else "No")
 
-        if result.pitch_hz is None:
-            self.pitch_label.setText("—")
-        else:
-            self.pitch_label.setText(f"{result.pitch_hz:.1f} Hz")
+        pitch_window_size = int(self.pitch_median_window_box.value())
+        res_window_size = int(self.resonance_median_window_box.value())
 
-        if result.primary_resonance_hz is None:
-            self.res1_label.setText("—")
-        else:
-            self.res1_label.setText(f"{result.primary_resonance_hz:.1f} Hz")
+        if self.raw_pitch_window.maxlen != pitch_window_size:
+            self.raw_pitch_window = deque(
+                self.raw_pitch_window, maxlen=pitch_window_size
+            )
 
-        if result.secondary_resonance_hz is None:
-            self.res2_label.setText("—")
-        else:
-            self.res2_label.setText(f"{result.secondary_resonance_hz:.1f} Hz")
+        if self.raw_resonance_window.maxlen != res_window_size:
+            self.raw_resonance_window = deque(
+                self.raw_resonance_window, maxlen=res_window_size
+            )
 
-        if result.pitch_hz is None or result.primary_resonance_hz is None:
+        median_pitch = self._median_filtered_value(
+            self.raw_pitch_window,
+            result.pitch_hz,
+        )
+
+        median_resonance = self._median_filtered_value(
+            self.raw_resonance_window,
+            result.primary_resonance_hz,
+        )
+
+        pitch_alpha = float(self.pitch_smoothing_box.value())
+        resonance_alpha = float(self.resonance_smoothing_box.value())
+
+        self.smoothed_pitch = self._smooth_value(
+            self.smoothed_pitch,
+            median_pitch,
+            pitch_alpha,
+        )
+
+        self.smoothed_resonance = self._smooth_value(
+            self.smoothed_resonance,
+            median_resonance,
+            resonance_alpha,
+        )
+
+        if self.smoothed_pitch is None or self.smoothed_resonance is None:
+            self.current_point.clear()
             return
 
-        self.pitch_history.append(result.pitch_hz)
-        self.resonance_history.append(result.primary_resonance_hz)
+        self.pitch_history.append(self.smoothed_pitch)
+        self.resonance_history.append(self.smoothed_resonance)
 
         x = np.asarray(self.pitch_history, dtype=float)
         y = np.asarray(self.resonance_history, dtype=float)
 
         self.trail_curve.setData(x, y)
         self.current_point.setData([x[-1]], [y[-1]])
+
+        if self.smoothed_pitch is None:
+            self.pitch_label.setText("—")
+        else:
+            self.pitch_label.setText(f"{self.smoothed_pitch:.1f} Hz")
+
+        if self.smoothed_resonance is None:
+            self.res1_label.setText("—")
+        else:
+            self.res1_label.setText(f"{self.smoothed_resonance:.1f} Hz")
+
+        if result.secondary_resonance_hz is None:
+            self.res2_label.setText("—")
+        else:
+            self.res2_label.setText(f"{result.secondary_resonance_hz:.1f} Hz")
 
     def _read_config_from_controls(self) -> AnalysisConfig:
         pitch_min = float(self.pitch_min_box.value())
@@ -252,6 +353,14 @@ class MainWindow(QtWidgets.QWidget):
         self.resonance_history.clear()
         self.trail_curve.clear()
         self.current_point.clear()
+
+        self.raw_pitch_window = deque(maxlen=self.pitch_median_window_box.value())
+        self.raw_resonance_window = deque(
+            maxlen=self.resonance_median_window_box.value()
+        )
+
+        self.smoothed_pitch = None
+        self.smoothed_resonance = None
 
         if was_running:
             self.start_audio()
