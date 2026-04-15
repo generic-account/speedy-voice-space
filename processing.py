@@ -16,13 +16,15 @@ class ProcessingSettings:
     pitch_alpha: float = 0.25
     resonance_alpha: float = 0.15
 
-    f2_low_hz: float = 800.0
-    f2_high_hz: float = 2500.0
+    f2_low_hz: float = 600.0
+    f2_high_hz: float = 3000.0
     f3_low_hz: float = 1500.0
-    f3_high_hz: float = 3500.0
+    f3_high_hz: float = 4500.0
     f2_weight: float = 0.6
     f3_weight: float = 0.4
 
+    f2_max_jump_hz: float = 500.0
+    f3_max_jump_hz: float = 700.0
 
 @dataclass(frozen=True)
 class DisplayState:
@@ -86,6 +88,8 @@ def median_filtered_value(
 class VoiceProcessor:
     def __init__(self, settings: Optional[ProcessingSettings] = None) -> None:
         self.settings = settings or ProcessingSettings()
+        self.tracked_f2_hz: Optional[float] = None
+        self.tracked_f3_hz: Optional[float] = None
         self._init_buffers()
 
     def _init_buffers(self) -> None:
@@ -97,6 +101,63 @@ class VoiceProcessor:
         )
         self.smoothed_pitch: Optional[float] = None
         self.smoothed_resonance: Optional[float] = None
+
+    def _pick_closest_candidate(
+        self,
+        candidates: Sequence[float],
+        previous: Optional[float],
+        max_jump_hz: float,
+    ) -> Optional[float]:
+        if not candidates:
+            return None
+
+        if previous is None:
+            return float(candidates[0])
+
+        best = min(candidates, key=lambda x: abs(x - previous))
+        if abs(best - previous) > max_jump_hz:
+            return None
+
+        return float(best)
+
+    def select_tracked_formants(
+        self,
+        candidates_hz: Sequence[float],
+    ) -> tuple[Optional[float], Optional[float]]:
+        s = self.settings
+        candidates = sorted(float(f) for f in candidates_hz)
+
+        f2_candidates = [f for f in candidates if s.f2_low_hz <= f <= s.f2_high_hz]
+        f3_candidates = [f for f in candidates if s.f3_low_hz <= f <= s.f3_high_hz]
+
+        f2 = self._pick_closest_candidate(
+            f2_candidates,
+            self.tracked_f2_hz,
+            s.f2_max_jump_hz,
+        )
+
+        if f2 is not None:
+            f3_candidates = [f for f in f3_candidates if abs(f - f2) > 1e-6]
+
+        f3 = self._pick_closest_candidate(
+            f3_candidates,
+            self.tracked_f3_hz,
+            s.f3_max_jump_hz,
+        )
+
+        # Enforce ordering if both exist
+        if f2 is not None and f3 is not None and f3 <= f2:
+            valid_f3 = [f for f in f3_candidates if f > f2]
+            f3 = self._pick_closest_candidate(
+                valid_f3,
+                self.tracked_f3_hz,
+                s.f3_max_jump_hz,
+            )
+
+        self.tracked_f2_hz = f2
+        self.tracked_f3_hz = f3
+
+        return f2, f3
 
     def update_settings(self, settings: ProcessingSettings) -> None:
         self.settings = settings
@@ -112,16 +173,19 @@ class VoiceProcessor:
 
         self.smoothed_pitch = None
         self.smoothed_resonance = None
+        self.tracked_f2_hz = None
+        self.tracked_f3_hz = None
 
     def reset(self) -> None:
+        self.tracked_f2_hz = None
+        self.tracked_f3_hz = None
         self._init_buffers()
 
     def compute_resonance(
         self,
         formants_hz: Sequence[float],
     ) -> tuple[Optional[float], float, Optional[float], Optional[float], Optional[float], Optional[float]]:
-        f2 = formants_hz[0] if len(formants_hz) > 1 else None
-        f3 = formants_hz[1] if len(formants_hz) > 2 else None
+        f2, f3 = self.select_tracked_formants(formants_hz)
 
         norm_f2: Optional[float] = None
         norm_f3: Optional[float] = None
