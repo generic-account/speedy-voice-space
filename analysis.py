@@ -24,6 +24,10 @@ class AnalysisConfig:
     pitch_max_hz: float = 500.0
     pitch_clarity_threshold: float = 0.30
 
+    max_f1_hz: float = 1200.0
+    max_f2_hz: float = 3000.0
+    max_f3_hz: float = 4500.0
+
 
 @dataclass(frozen=True)
 class AnalysisResult:
@@ -49,7 +53,6 @@ def apply_pre_emphasis(frame: np.ndarray, coeff: float = 0.97) -> np.ndarray:
         return frame
     return np.append(frame[0], frame[1:] - coeff * frame[:-1])
 
-
 def extract_formants_from_lpc_roots(
     lpc_coeffs: np.ndarray,
     samplerate: int,
@@ -59,13 +62,6 @@ def extract_formants_from_lpc_roots(
     min_freq_hz: float = 90.0,
     max_freq_margin_hz: float = 50.0,
 ) -> List[float]:
-    """
-    Extract formants from LPC polynomial roots.
-
-    This follows the same basic method used in the pasted AURORA code:
-    keep stable roots in the upper half-plane, convert them to frequency
-    and bandwidth, then filter for plausible resonances.
-    """
     roots = np.roots(lpc_coeffs)
     roots = roots[np.imag(roots) >= 0]
     roots = roots[np.abs(roots) < 1.0]
@@ -85,7 +81,6 @@ def extract_formants_from_lpc_roots(
 
     filtered = np.sort(freqs[mask])[:max_formants]
     return [float(f) for f in filtered]
-
 
 def compute_lpc_spectrum(
     frame: np.ndarray,
@@ -167,12 +162,14 @@ class RealtimeAnalyzer:
         self.config = config
         self._buffer: Deque[float] = deque(maxlen=config.frame_size)
         self._result_callback: Optional[Callable[[AnalysisResult], None]] = None
+        self.frames_seen = 0
 
     def set_result_callback(self, callback: Callable[[AnalysisResult], None]) -> None:
         self._result_callback = callback
 
     def reset(self) -> None:
         self._buffer = deque(maxlen=self.config.frame_size)
+        self.frames_seen = 0
 
     def update_config(self, config: AnalysisConfig) -> None:
         self.config = config
@@ -181,6 +178,7 @@ class RealtimeAnalyzer:
     def push_audio(self, block: np.ndarray) -> Optional[AnalysisResult]:
         mono = np.asarray(block, dtype=np.float32).reshape(-1)
         self._buffer.extend(mono.tolist())
+        self.frames_seen += 1
 
         if len(self._buffer) < self.config.frame_size:
             return None
