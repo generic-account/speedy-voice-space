@@ -22,3 +22,5 @@ Notes:
 - Tune RMS cutoff based on your room's noise level
 - Speak close to the microphone
 - Higher window lengths will be less responsive but more accurate.
+
+![Example of UI](./vocal_img.png)
