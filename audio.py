@@ -26,9 +26,6 @@ class AudioDevice:
 def list_input_devices() -> List[AudioDevice]:
     """
     Return all input-capable audio devices.
-
-    The original AURORA code filters sounddevice devices by
-    max_input_channels > 0. This keeps the same behavior.
     """
     devices = sd.query_devices()
     result: List[AudioDevice] = []
@@ -40,9 +37,10 @@ def list_input_devices() -> List[AudioDevice]:
                     index=idx,
                     name=str(dev.get("name", f"Device {idx}")),
                     max_input_channels=int(dev.get("max_input_channels", 0)),
-                    default_samplerate=float(dev.get("default_samplerate", 16000.0)),
+                    default_samplerate=float(dev.get("default_samplerate", 48000.0)),
                 )
             )
+
     return result
 
 
@@ -50,8 +48,7 @@ class AudioInputManager:
     """
     Manages a single-channel sounddevice InputStream.
 
-    This class is intentionally UI-agnostic. You can use it from PyQt,
-    a CLI tool, or another application layer.
+    This class is UI-agnostic and only delivers mono float32 blocks to a callback.
     """
 
     def __init__(
@@ -89,7 +86,16 @@ class AudioInputManager:
         return self._stream is not None
 
     def refresh_devices(self) -> List[AudioDevice]:
+        """
+        Refresh the cached list of input devices.
+        """
+        old_selected = self._selected_device_index
         self._devices = list_input_devices()
+
+        # Keep current selection if still valid
+        if old_selected is not None and not any(d.index == old_selected for d in self._devices):
+            self._selected_device_index = None
+
         return self._devices
 
     def set_frame_callback(self, callback: AudioFrameCallback) -> None:
@@ -103,7 +109,7 @@ class AudioInputManager:
             return
 
         try:
-            # flatten to mono float array
+            # Flatten to mono float32 array.
             frame = np.asarray(indata[:, 0], dtype=np.float32).copy()
             self._frame_callback(frame)
         except Exception as exc:
@@ -116,7 +122,7 @@ class AudioInputManager:
         channels: Optional[int] = None,
     ) -> Optional[str]:
         """
-        Returns None if settings are valid, otherwise returns the error string.
+        Return None if settings are valid, otherwise return the error string.
         """
         if device_index is None:
             device_index = self._selected_device_index
@@ -135,6 +141,33 @@ class AudioInputManager:
             return None
         except Exception as exc:
             return str(exc)
+
+    def _candidate_sample_rates(self, requested: int, default: int) -> List[int]:
+        """
+        Build a deduplicated list of sample rates to try.
+
+        Order:
+        1. requested rate
+        2. device default
+        3. common hardware rates
+        """
+        candidates = [
+            requested,
+            default,
+            48000,
+            44100,
+            32000,
+            16000,
+        ]
+
+        deduped: List[int] = []
+        seen = set()
+        for rate in candidates:
+            rate = int(rate)
+            if rate > 0 and rate not in seen:
+                deduped.append(rate)
+                seen.add(rate)
+        return deduped
 
     def start(self, device_index: Optional[int] = None) -> None:
         if self._frame_callback is None:
@@ -156,16 +189,23 @@ class AudioInputManager:
 
         requested_samplerate = int(self.samplerate)
         fallback_samplerate = int(round(selected.default_samplerate))
+        try_rates = self._candidate_sample_rates(
+            requested=requested_samplerate,
+            default=fallback_samplerate,
+        )
 
-        # Try requested samplerate first
-        try_rates = [requested_samplerate]
-        if fallback_samplerate not in try_rates:
-            try_rates.append(fallback_samplerate)
-
-        last_exc = None
+        last_exc: Optional[Exception] = None
 
         for rate in try_rates:
             try:
+                # Validate first where possible
+                sd.check_input_settings(
+                    device=self._selected_device_index,
+                    channels=self.channels,
+                    samplerate=rate,
+                    dtype=self.dtype,
+                )
+
                 self._stream = sd.InputStream(
                     device=self._selected_device_index,
                     callback=self._audio_callback,
@@ -176,23 +216,22 @@ class AudioInputManager:
                 )
                 self._stream.start()
                 self.samplerate = rate
+
                 print(
                     f"Started input stream on '{selected.name}' "
                     f"at {rate} Hz (blocksize={self.blocksize})"
                 )
                 return
+
             except Exception as exc:
                 last_exc = exc
                 self._stream = None
-                print(
-                    f"Failed to start '{selected.name}' at {rate} Hz: {exc}"
-                )
+                print(f"Failed to start '{selected.name}' at {rate} Hz: {exc}")
 
         raise RuntimeError(
             f"Could not start audio stream for device '{selected.name}'. "
             f"Tried sample rates: {try_rates}. Last error: {last_exc}"
         ) from last_exc
-
 
     def stop(self) -> None:
         if self._stream is None:

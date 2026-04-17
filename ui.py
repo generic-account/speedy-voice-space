@@ -18,17 +18,6 @@ class AnalysisEmitter(QtCore.QObject):
 
 
 class MainWindow(QtWidgets.QWidget):
-    """
-    UI-only layer.
-
-    Left:
-        - main pitch vs resonance plot
-
-    Right:
-        - compact formant-over-time plots (stacked)
-        - settings / readouts below
-    """
-
     def __init__(self, config: Optional[AnalysisConfig] = None) -> None:
         super().__init__()
 
@@ -36,7 +25,7 @@ class MainWindow(QtWidgets.QWidget):
         self.analyzer = RealtimeAnalyzer(self.config)
         self.audio = AudioInputManager(
             samplerate=self.config.samplerate,
-            blocksize=self.config.frame_size,
+            blocksize=self.config.block_size,
             channels=1,
         )
 
@@ -45,7 +34,6 @@ class MainWindow(QtWidgets.QWidget):
         self.pitch_history: Deque[float] = deque(maxlen=120)
         self.resonance_history: Deque[float] = deque(maxlen=120)
 
-        # Compact formant histories for top-right plots
         self.formant_plot_history_len = 240
         self.f2_history: Deque[float] = deque(maxlen=self.formant_plot_history_len)
         self.f3_history: Deque[float] = deque(maxlen=self.formant_plot_history_len)
@@ -63,12 +51,12 @@ class MainWindow(QtWidgets.QWidget):
         pg.setConfigOption("foreground", "k")
 
         self.setWindowTitle("Pitch / Resonance Monitor")
-        self.resize(1400, 820)
+        self.resize(1500, 900)
 
         root_layout = QtWidgets.QHBoxLayout(self)
 
         #
-        # Left side: main pitch/resonance plot
+        # Left: main plot
         #
         self.graphics = pg.GraphicsLayoutWidget()
         self.main_plot = self.graphics.addPlot(title="Real-time Pitch vs Resonance")
@@ -92,7 +80,7 @@ class MainWindow(QtWidgets.QWidget):
         root_layout.addWidget(self.graphics, stretch=4)
 
         #
-        # Right side: top graphs + bottom controls/readouts
+        # Right: mini plots + settings/readouts
         #
         right_panel = QtWidgets.QWidget()
         right_layout = QtWidgets.QVBoxLayout(right_panel)
@@ -100,14 +88,13 @@ class MainWindow(QtWidgets.QWidget):
         right_layout.setSpacing(1)
 
         #
-        # Top-right compact formant graphs
+        # Top-right compact formant plots
         #
         formant_graphs_box = QtWidgets.QWidget()
         formant_graphs_layout = QtWidgets.QVBoxLayout(formant_graphs_box)
         formant_graphs_layout.setContentsMargins(0, 0, 0, 0)
         formant_graphs_layout.setSpacing(1)
 
-        # Small label + compact plot for candidate 1
         self.f2_title = QtWidgets.QLabel("F2 / time")
         self.f2_title.setStyleSheet("font-size: 11px; padding: 0px; margin: 0px;")
         self.f2_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
@@ -120,17 +107,11 @@ class MainWindow(QtWidgets.QWidget):
         self.f2_plot.setMouseEnabled(x=False, y=False)
         self.f2_plot.setMinimumHeight(85)
         self.f2_plot.setMaximumHeight(95)
-
-        # Remove all bottom-axis clutter
         self.f2_plot.hideAxis("bottom")
-
-        # Tighten internal padding/margins
         self.f2_plot.getPlotItem().getViewBox().setDefaultPadding(0.0)
         self.f2_plot.getPlotItem().layout.setContentsMargins(0, 0, 0, 0)
-
         self.f2_curve = self.f2_plot.plot(pen=pg.mkPen(width=2))
 
-        # Small label + compact plot for candidate 2
         self.f3_title = QtWidgets.QLabel("F3 / time")
         self.f3_title.setStyleSheet("font-size: 11px; padding: 0px; margin: 0px;")
         self.f3_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
@@ -143,14 +124,9 @@ class MainWindow(QtWidgets.QWidget):
         self.f3_plot.setMouseEnabled(x=False, y=False)
         self.f3_plot.setMinimumHeight(85)
         self.f3_plot.setMaximumHeight(95)
-
-        # Remove all bottom-axis clutter
         self.f3_plot.hideAxis("bottom")
-
-        # Tighten internal padding/margins
         self.f3_plot.getPlotItem().getViewBox().setDefaultPadding(0.0)
         self.f3_plot.getPlotItem().layout.setContentsMargins(0, 0, 0, 0)
-
         self.f3_curve = self.f3_plot.plot(pen=pg.mkPen(width=2))
 
         formant_graphs_layout.addWidget(self.f2_title)
@@ -161,7 +137,7 @@ class MainWindow(QtWidgets.QWidget):
         right_layout.addWidget(formant_graphs_box, stretch=0)
 
         #
-        # Bottom-right: controls + text output
+        # Bottom-right: controls and readouts
         #
         controls = QtWidgets.QWidget()
         controls_layout = QtWidgets.QHBoxLayout(controls)
@@ -182,20 +158,25 @@ class MainWindow(QtWidgets.QWidget):
         controls_layout.addWidget(left_col, stretch=1)
         controls_layout.addWidget(right_col, stretch=1)
 
+        #
+        # Controls
+        #
         self.device_dropdown = QtWidgets.QComboBox()
 
         self.fs_box = QtWidgets.QSpinBox()
         self.fs_box.setRange(8000, 48000)
         self.fs_box.setValue(self.config.samplerate)
 
-        self.frame_box = QtWidgets.QSpinBox()
-        self.frame_box.setRange(256, 4096)
-        self.frame_box.setSingleStep(128)
-        self.frame_box.setValue(self.config.frame_size)
+        self.block_size_box = QtWidgets.QSpinBox()
+        self.block_size_box.setRange(128, 4096)
+        self.block_size_box.setSingleStep(128)
+        self.block_size_box.setValue(self.config.block_size)
 
-        self.lpc_box = QtWidgets.QSpinBox()
-        self.lpc_box.setRange(4, 30)
-        self.lpc_box.setValue(self.config.lpc_order)
+        self.buffer_duration_box = QtWidgets.QDoubleSpinBox()
+        self.buffer_duration_box.setRange(0.02, 0.30)
+        self.buffer_duration_box.setDecimals(3)
+        self.buffer_duration_box.setSingleStep(0.005)
+        self.buffer_duration_box.setValue(self.config.buffer_duration_s)
 
         self.threshold_box = QtWidgets.QDoubleSpinBox()
         self.threshold_box.setRange(0.0, 0.20)
@@ -203,13 +184,56 @@ class MainWindow(QtWidgets.QWidget):
         self.threshold_box.setSingleStep(0.0001)
         self.threshold_box.setValue(self.config.rms_threshold)
 
-        self.pitch_min_box = QtWidgets.QSpinBox()
-        self.pitch_min_box.setRange(40, 400)
-        self.pitch_min_box.setValue(int(self.config.pitch_min_hz))
+        self.pitch_floor_box = QtWidgets.QDoubleSpinBox()
+        self.pitch_floor_box.setRange(40.0, 300.0)
+        self.pitch_floor_box.setDecimals(1)
+        self.pitch_floor_box.setValue(self.config.pitch_floor_hz)
 
-        self.pitch_max_box = QtWidgets.QSpinBox()
-        self.pitch_max_box.setRange(80, 1200)
-        self.pitch_max_box.setValue(int(self.config.pitch_max_hz))
+        self.pitch_ceiling_box = QtWidgets.QDoubleSpinBox()
+        self.pitch_ceiling_box.setRange(100.0, 800.0)
+        self.pitch_ceiling_box.setDecimals(1)
+        self.pitch_ceiling_box.setValue(self.config.pitch_ceiling_hz)
+
+        self.pitch_silence_box = QtWidgets.QDoubleSpinBox()
+        self.pitch_silence_box.setRange(0.0, 1.0)
+        self.pitch_silence_box.setDecimals(2)
+        self.pitch_silence_box.setSingleStep(0.01)
+        self.pitch_silence_box.setValue(self.config.pitch_silence_threshold)
+
+        self.pitch_voicing_box = QtWidgets.QDoubleSpinBox()
+        self.pitch_voicing_box.setRange(0.0, 1.0)
+        self.pitch_voicing_box.setDecimals(2)
+        self.pitch_voicing_box.setSingleStep(0.01)
+        self.pitch_voicing_box.setValue(self.config.pitch_voicing_threshold)
+
+        self.pitch_accurate_box = QtWidgets.QCheckBox()
+        self.pitch_accurate_box.setChecked(self.config.pitch_very_accurate)
+
+        self.formant_time_step_box = QtWidgets.QDoubleSpinBox()
+        self.formant_time_step_box.setRange(0.001, 0.05)
+        self.formant_time_step_box.setDecimals(3)
+        self.formant_time_step_box.setSingleStep(0.001)
+        self.formant_time_step_box.setValue(self.config.formant_time_step)
+
+        self.max_formants_box = QtWidgets.QDoubleSpinBox()
+        self.max_formants_box.setRange(3.0, 7.0)
+        self.max_formants_box.setDecimals(1)
+        self.max_formants_box.setSingleStep(0.5)
+        self.max_formants_box.setValue(self.config.max_number_of_formants)
+
+        self.maximum_formant_box = QtWidgets.QSpinBox()
+        self.maximum_formant_box.setRange(3000, 8000)
+        self.maximum_formant_box.setValue(int(self.config.maximum_formant_hz))
+
+        self.window_length_box = QtWidgets.QDoubleSpinBox()
+        self.window_length_box.setRange(0.010, 0.080)
+        self.window_length_box.setDecimals(3)
+        self.window_length_box.setSingleStep(0.001)
+        self.window_length_box.setValue(self.config.window_length_s)
+
+        self.pre_emphasis_box = QtWidgets.QSpinBox()
+        self.pre_emphasis_box.setRange(0, 1000)
+        self.pre_emphasis_box.setValue(int(self.config.pre_emphasis_from_hz))
 
         self.pitch_median_window_box = QtWidgets.QSpinBox()
         self.pitch_median_window_box.setRange(1, 15)
@@ -233,11 +257,11 @@ class MainWindow(QtWidgets.QWidget):
 
         self.f2_low_box = QtWidgets.QSpinBox()
         self.f2_low_box.setRange(200, 10000)
-        self.f2_low_box.setValue(800)
+        self.f2_low_box.setValue(600)
 
         self.f2_high_box = QtWidgets.QSpinBox()
         self.f2_high_box.setRange(200, 10000)
-        self.f2_high_box.setValue(2500)
+        self.f2_high_box.setValue(3000)
 
         self.f3_low_box = QtWidgets.QSpinBox()
         self.f3_low_box.setRange(500, 12000)
@@ -245,7 +269,7 @@ class MainWindow(QtWidgets.QWidget):
 
         self.f3_high_box = QtWidgets.QSpinBox()
         self.f3_high_box.setRange(500, 12000)
-        self.f3_high_box.setValue(3500)
+        self.f3_high_box.setValue(4500)
 
         self.f2_weight_box = QtWidgets.QDoubleSpinBox()
         self.f2_weight_box.setRange(0.0, 1.0)
@@ -263,13 +287,15 @@ class MainWindow(QtWidgets.QWidget):
         self.stop_button = QtWidgets.QPushButton("Stop")
         self.apply_button = QtWidgets.QPushButton("Apply Settings")
 
+        #
+        # Readout labels
+        #
         self.pitch_label = QtWidgets.QLabel("—")
         self.resonance_label = QtWidgets.QLabel("—")
         self.confidence_label = QtWidgets.QLabel("—")
         self.rms_label = QtWidgets.QLabel("—")
         self.voice_label = QtWidgets.QLabel("—")
         self.frames_label = QtWidgets.QLabel("0")
-
         self.raw_f2_label = QtWidgets.QLabel("—")
         self.raw_f3_label = QtWidgets.QLabel("—")
         self.formants_label = QtWidgets.QLabel("—")
@@ -296,32 +322,51 @@ class MainWindow(QtWidgets.QWidget):
         self.formants_label.setWordWrap(True)
         self.formants_label.setMinimumWidth(180)
 
-        # Left column: audio + processing controls
+        #
+        # Left column: controls
+        #
         left_form.addRow("Input Device", self.device_dropdown)
         left_form.addRow("Sample Rate", self.fs_box)
-        left_form.addRow("Frame Size", self.frame_box)
-        left_form.addRow("LPC Order", self.lpc_box)
+        left_form.addRow("Block Size", self.block_size_box)
+        left_form.addRow("Buffer Duration (s)", self.buffer_duration_box)
         left_form.addRow("RMS Threshold", self.threshold_box)
-        left_form.addRow("Pitch Min (Hz)", self.pitch_min_box)
-        left_form.addRow("Pitch Max (Hz)", self.pitch_max_box)
+
+        left_form.addRow("Pitch Floor (Hz)", self.pitch_floor_box)
+        left_form.addRow("Pitch Ceiling (Hz)", self.pitch_ceiling_box)
+        left_form.addRow("Pitch Silence Thresh", self.pitch_silence_box)
+        left_form.addRow("Pitch Voicing Thresh", self.pitch_voicing_box)
+        left_form.addRow("Pitch Very Accurate", self.pitch_accurate_box)
+
+        left_form.addRow("Formant Time Step (s)", self.formant_time_step_box)
+        left_form.addRow("Max # Formants", self.max_formants_box)
+        left_form.addRow("Maximum Formant (Hz)", self.maximum_formant_box)
+        left_form.addRow("Window Length (s)", self.window_length_box)
+        left_form.addRow("Pre-emphasis From (Hz)", self.pre_emphasis_box)
 
         left_form.addRow("Pitch Median Window", self.pitch_median_window_box)
         left_form.addRow("Resonance Median Window", self.resonance_median_window_box)
         left_form.addRow("Pitch Smoothing", self.pitch_smoothing_box)
         left_form.addRow("Resonance Smoothing", self.resonance_smoothing_box)
 
-        left_form.addRow("Candidate 1 Low (Hz)", self.f2_low_box)
-        left_form.addRow("Candidate 1 High (Hz)", self.f2_high_box)
-        left_form.addRow("Candidate 2 Low (Hz)", self.f3_low_box)
-        left_form.addRow("Candidate 2 High (Hz)", self.f3_high_box)
-        left_form.addRow("Candidate 1 Weight", self.f2_weight_box)
-        left_form.addRow("Candidate 2 Weight", self.f3_weight_box)
+        left_form.addRow("F2 Low (Hz)", self.f2_low_box)
+        left_form.addRow("F2 High (Hz)", self.f2_high_box)
+        left_form.addRow("F3 Low (Hz)", self.f3_low_box)
+        left_form.addRow("F3 High (Hz)", self.f3_high_box)
+        left_form.addRow("F2 Weight", self.f2_weight_box)
+        left_form.addRow("F3 Weight", self.f3_weight_box)
 
-        left_form.addRow(self.start_button)
-        left_form.addRow(self.stop_button)
-        left_form.addRow(self.apply_button)
+        button_row = QtWidgets.QWidget()
+        button_layout = QtWidgets.QHBoxLayout(button_row)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.setSpacing(6)
+        button_layout.addWidget(self.start_button)
+        button_layout.addWidget(self.stop_button)
+        button_layout.addWidget(self.apply_button)
+        left_form.addRow(button_row)
 
-        # Right column: readouts / debug info
+        #
+        # Right column: compact readouts
+        #
         readout_names = [
             "Pitch",
             "Resonance",
@@ -329,8 +374,8 @@ class MainWindow(QtWidgets.QWidget):
             "RMS",
             "Voiced",
             "Frames Seen",
-            "Candidate 1",
-            "Candidate 2",
+            "F2",
+            "F3",
             "All Formants",
         ]
 
@@ -412,54 +457,60 @@ class MainWindow(QtWidgets.QWidget):
         self.emitter.result_ready.emit(result)
 
     def _read_config_from_controls(self) -> AnalysisConfig:
-        pitch_min = float(self.pitch_min_box.value())
-        pitch_max = float(self.pitch_max_box.value())
-        if pitch_max <= pitch_min:
-            pitch_max = pitch_min + 1.0
+        pitch_floor = float(self.pitch_floor_box.value())
+        pitch_ceiling = float(self.pitch_ceiling_box.value())
+        if pitch_ceiling <= pitch_floor:
+            pitch_ceiling = pitch_floor + 1.0
 
         return AnalysisConfig(
             samplerate=int(self.fs_box.value()),
-            frame_size=int(self.frame_box.value()),
-            lpc_order=int(self.lpc_box.value()),
+            block_size=int(self.block_size_box.value()),
+            buffer_duration_s=float(self.buffer_duration_box.value()),
             rms_threshold=float(self.threshold_box.value()),
-            pitch_min_hz=pitch_min,
-            pitch_max_hz=pitch_max,
+            pitch_time_step=0.01,
+            pitch_floor_hz=pitch_floor,
+            pitch_ceiling_hz=pitch_ceiling,
+            pitch_silence_threshold=float(self.pitch_silence_box.value()),
+            pitch_voicing_threshold=float(self.pitch_voicing_box.value()),
+            pitch_very_accurate=bool(self.pitch_accurate_box.isChecked()),
+            formant_time_step=float(self.formant_time_step_box.value()),
+            max_number_of_formants=float(self.max_formants_box.value()),
+            maximum_formant_hz=float(self.maximum_formant_box.value()),
+            window_length_s=float(self.window_length_box.value()),
+            pre_emphasis_from_hz=float(self.pre_emphasis_box.value()),
         )
 
     def _read_processing_settings_from_controls(self) -> ProcessingSettings:
-        c1_low = float(self.f2_low_box.value())
-        c1_high = float(self.f2_high_box.value())
-        c2_low = float(self.f3_low_box.value())
-        c2_high = float(self.f3_high_box.value())
+        f2_low = float(self.f2_low_box.value())
+        f2_high = float(self.f2_high_box.value())
+        f3_low = float(self.f3_low_box.value())
+        f3_high = float(self.f3_high_box.value())
 
-        if c1_high <= c1_low:
-            c1_high = c1_low + 1.0
-        if c2_high <= c2_low:
-            c2_high = c2_low + 1.0
+        if f2_high <= f2_low:
+            f2_high = f2_low + 1.0
+        if f3_high <= f3_low:
+            f3_high = f3_low + 1.0
 
-        c1_weight = float(self.f2_weight_box.value())
-        c2_weight = float(self.f3_weight_box.value())
-        weight_sum = c1_weight + c2_weight
-        if weight_sum <= 0:
-            c1_weight, c2_weight = 0.6, 0.4
+        f2_weight = float(self.f2_weight_box.value())
+        f3_weight = float(self.f3_weight_box.value())
+        if (f2_weight + f3_weight) <= 0:
+            f2_weight, f3_weight = 0.6, 0.4
 
         return ProcessingSettings(
             pitch_median_window=int(self.pitch_median_window_box.value()),
             resonance_median_window=int(self.resonance_median_window_box.value()),
             pitch_alpha=float(self.pitch_smoothing_box.value()),
             resonance_alpha=float(self.resonance_smoothing_box.value()),
-            f2_low_hz=c1_low,
-            f2_high_hz=c1_high,
-            f3_low_hz=c2_low,
-            f3_high_hz=c2_high,
-            f2_weight=c1_weight,
-            f3_weight=c2_weight,
+            f2_low_hz=f2_low,
+            f2_high_hz=f2_high,
+            f3_low_hz=f3_low,
+            f3_high_hz=f3_high,
+            f2_weight=f2_weight,
+            f3_weight=f3_weight,
         )
 
     def apply_processing_settings(self) -> None:
-        self.processor.update_settings(
-            self._read_processing_settings_from_controls()
-        )
+        self.processor.update_settings(self._read_processing_settings_from_controls())
 
     def apply_settings(self) -> None:
         was_running = self.audio.is_running
@@ -469,7 +520,7 @@ class MainWindow(QtWidgets.QWidget):
         self.config = self._read_config_from_controls()
         self.analyzer.update_config(self.config)
         self.audio.samplerate = self.config.samplerate
-        self.audio.blocksize = self.config.frame_size
+        self.audio.blocksize = self.config.block_size
 
         self.apply_processing_settings()
         self.processor.reset()
@@ -488,11 +539,11 @@ class MainWindow(QtWidgets.QWidget):
             self.start_audio()
 
     def _update_formant_plots(self, state) -> None:
-        c1 = state.raw_f2_hz
-        c2 = state.raw_f3_hz
+        f2 = state.raw_f2_hz
+        f3 = state.raw_f3_hz
 
-        self.f2_history.append(np.nan if c1 is None else float(c1))
-        self.f3_history.append(np.nan if c2 is None else float(c2))
+        self.f2_history.append(np.nan if f2 is None else float(f2))
+        self.f3_history.append(np.nan if f3 is None else float(f3))
 
         x1 = np.arange(len(self.f2_history), dtype=float)
         y1 = np.asarray(self.f2_history, dtype=float)
@@ -522,12 +573,12 @@ class MainWindow(QtWidgets.QWidget):
 
         self.confidence_label.setText(f"{state.resonance_confidence:.2f}")
 
-        if getattr(state, "raw_f2_hz", None) is None:
+        if state.raw_f2_hz is None:
             self.raw_f2_label.setText("missing")
         else:
             self.raw_f2_label.setText(f"{state.raw_f2_hz:.1f} Hz")
 
-        if getattr(state, "raw_f3_hz", None) is None:
+        if state.raw_f3_hz is None:
             self.raw_f3_label.setText("missing")
         else:
             self.raw_f3_label.setText(f"{state.raw_f3_hz:.1f} Hz")
@@ -557,7 +608,7 @@ class MainWindow(QtWidgets.QWidget):
         self.audio.restart(
             device_index=device_index,
             samplerate=self.config.samplerate,
-            blocksize=self.config.frame_size,
+            blocksize=self.config.block_size,
         )
 
         if self.audio.samplerate != self.config.samplerate:
