@@ -15,12 +15,15 @@ pip install -r requirements.txt
 python3 ui.py
 ```
 
-Notes:
+
+## UI Example
+
+![Example of UI](./vocal_img.png)
+
+## Notes:
 - Not all audio devices will work, try a variety of devices to determine what is functional and is best.
 - Fairly sensitive to noise. Use in a quiet, private environment.
 - If your space is noisy, you can increase median ranges, or reduce exp decay params.
 - Tune RMS cutoff based on your room's noise level
 - Speak close to the microphone
 - Higher window lengths will be less responsive but more accurate.
-
-![Example of UI](./vocal_img.png)
