@@ -31,3 +31,4 @@ python3 ui.py
 ## TODO:
 - Background noise reduction
 - Better defaults
+- prettier graphs (older pts dimmer)
