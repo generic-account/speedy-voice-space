@@ -1,5 +1,5 @@
 # speedy-voice-space
-Real time pitch and resonance tracking, with normalization
+Real-time pitch and formant/resonance tracking, with praat, noise reduction, normalization, and 2D plots
 
 ## Install
 
