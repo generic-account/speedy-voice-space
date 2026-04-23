@@ -429,12 +429,11 @@ class MainWindow(QtWidgets.QWidget):
         root_layout.addWidget(right_panel, stretch=2)
 
         self.timer = QtCore.QTimer(self)
-        self.timer.timeout.connect(lambda: None)
         self.timer.start(30)
 
     def _wire_callbacks(self) -> None:
         self.audio.set_frame_callback(self.analyzer.push_audio)
-        self.analyzer.set_result_callback(self._handle_analysis_result)
+        self.analyzer.set_result_callback(self.emitter.result_ready.emit)
 
         self.start_button.clicked.connect(self.start_audio)
         self.stop_button.clicked.connect(self.stop_audio)
@@ -454,28 +453,32 @@ class MainWindow(QtWidgets.QWidget):
             return None
         return self.device_dropdown.itemData(idx)
 
+    def _set_spin_value_blocked(self, box, value) -> None:
+        box.blockSignals(True)
+        box.setValue(value)
+        box.blockSignals(False)
+
+    def _set_optional_hz_label(self, label, value: Optional[float]) -> None:
+        if value is None:
+            label.setText("missing")
+        else:
+            label.setText(f"{value:.1f} Hz")
+
     def _on_device_changed(self, _: int) -> None:
         device_index = self._get_selected_device_index()
         if device_index is None:
             return
 
-        selected = None
-        for dev in self.audio.devices:
-            if dev.index == device_index:
-                selected = dev
-                break
-
+        selected = next(
+            (dev for dev in self.audio.devices if dev.index == device_index),
+            None,
+        )
         if selected is not None:
             device_rate = int(round(selected.default_samplerate))
-            self.fs_box.blockSignals(True)
-            self.fs_box.setValue(device_rate)
-            self.fs_box.blockSignals(False)
+            self._set_spin_value_blocked(self.fs_box, device_rate)
 
         if self.audio.is_running:
             self.apply_settings()
-
-    def _handle_analysis_result(self, result: AnalysisResult) -> None:
-        self.emitter.result_ready.emit(result)
 
     def _read_config_from_controls(self) -> AnalysisConfig:
         pitch_floor = float(self.pitch_floor_box.value())
@@ -597,15 +600,8 @@ class MainWindow(QtWidgets.QWidget):
 
         self.confidence_label.setText(f"{state.resonance_confidence:.2f}")
 
-        if state.raw_f2_hz is None:
-            self.raw_f2_label.setText("missing")
-        else:
-            self.raw_f2_label.setText(f"{state.raw_f2_hz:.1f} Hz")
-
-        if state.raw_f3_hz is None:
-            self.raw_f3_label.setText("missing")
-        else:
-            self.raw_f3_label.setText(f"{state.raw_f3_hz:.1f} Hz")
+        self._set_optional_hz_label(self.raw_f2_label, state.raw_f2_hz)
+        self._set_optional_hz_label(self.raw_f3_label, state.raw_f3_hz)
 
         if state.formants_hz:
             self.formants_label.setText(
@@ -651,9 +647,7 @@ class MainWindow(QtWidgets.QWidget):
 
         if self.audio.samplerate != self.config.samplerate:
             self.config = replace(self.config, samplerate=self.audio.samplerate)
-            self.fs_box.blockSignals(True)
-            self.fs_box.setValue(self.audio.samplerate)
-            self.fs_box.blockSignals(False)
+            self._set_spin_value_blocked(self.fs_box, self.audio.samplerate)
             self.analyzer.update_config(self.config)
 
     def stop_audio(self) -> None:

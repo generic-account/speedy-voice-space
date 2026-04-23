@@ -74,12 +74,7 @@ class AudioInputManager:
 
     @property
     def selected_device(self) -> Optional[AudioDevice]:
-        if self._selected_device_index is None:
-            return None
-        for dev in self._devices:
-            if dev.index == self._selected_device_index:
-                return dev
-        return None
+        return self._find_device(self._selected_device_index)
 
     @property
     def is_running(self) -> bool:
@@ -93,10 +88,18 @@ class AudioInputManager:
         self._devices = list_input_devices()
 
         # Keep current selection if still valid
-        if old_selected is not None and not any(d.index == old_selected for d in self._devices):
+        if old_selected is not None and self._find_device(old_selected) is None:
             self._selected_device_index = None
 
         return self._devices
+
+    def _find_device(self, device_index: Optional[int]) -> Optional[AudioDevice]:
+        if device_index is None:
+            return None
+        for dev in self._devices:
+            if dev.index == device_index:
+                return dev
+        return None
 
     def set_frame_callback(self, callback: AudioFrameCallback) -> None:
         self._frame_callback = callback

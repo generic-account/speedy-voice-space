@@ -44,18 +44,6 @@ class AudioPreprocessor:
         pass
 
 
-class BypassPreprocessor(AudioPreprocessor):
-    def process_block(
-        self,
-        block: np.ndarray,
-        samplerate: int,
-    ) -> Tuple[np.ndarray, float]:
-        return np.asarray(block, dtype=np.float32), 0.0
-
-    def reset(self) -> None:
-        pass
-
-
 class RNNoisePreprocessor(AudioPreprocessor):
     """
     Streaming RNNoise adapter.
