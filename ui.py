@@ -86,7 +86,7 @@ class MainWindow(QtWidgets.QWidget):
         right_panel = QtWidgets.QWidget()
         right_layout = QtWidgets.QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(1)
+        right_layout.setSpacing(8)
 
         #
         # Top-right compact formant plots
@@ -153,18 +153,22 @@ class MainWindow(QtWidgets.QWidget):
         controls = QtWidgets.QWidget()
         controls_layout = QtWidgets.QHBoxLayout(controls)
         controls_layout.setContentsMargins(0, 0, 0, 0)
-        controls_layout.setSpacing(12)
+        controls_layout.setSpacing(8)
 
         left_col = QtWidgets.QWidget()
         left_form = QtWidgets.QFormLayout(left_col)
         left_form.setContentsMargins(0, 0, 0, 0)
         left_form.setSpacing(4)
+        left_form.setVerticalSpacing(3)
+        left_form.setHorizontalSpacing(8)
 
         right_col = QtWidgets.QWidget()
-        right_grid = QtWidgets.QGridLayout(right_col)
-        right_grid.setContentsMargins(0, 0, 0, 0)
-        right_grid.setHorizontalSpacing(8)
-        right_grid.setVerticalSpacing(4)
+        right_col.setMinimumWidth(220)
+        right_form = QtWidgets.QFormLayout(right_col)
+        right_form.setContentsMargins(0, 0, 0, 0)
+        right_form.setSpacing(4)
+        right_form.setVerticalSpacing(3)
+        right_form.setHorizontalSpacing(8)
 
         controls_layout.addWidget(left_col, stretch=1)
         controls_layout.addWidget(right_col, stretch=1)
@@ -339,7 +343,10 @@ class MainWindow(QtWidgets.QWidget):
             label.setMinimumWidth(140)
 
         self.formants_label.setWordWrap(True)
-        self.formants_label.setMinimumWidth(180)
+        self.formants_label.setMinimumWidth(160)
+        self.formants_label.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop
+        )
 
         #
         # Left column: controls
@@ -385,45 +392,24 @@ class MainWindow(QtWidgets.QWidget):
         button_layout.addWidget(self.apply_button)
         left_form.addRow(button_row)
 
-        #
-        # Right column: compact readouts
-        #
-        readout_names = [
-            "Pitch",
-            "Resonance",
-            "Confidence",
-            "RMS",
-            "Voiced",
-            "Frames Seen",
-            "F2",
-            "F3",
-            "All Formants",
-        ]
+        voice_title = QtWidgets.QLabel("Voice")
+        voice_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        voice_title.setStyleSheet("font-weight: 600; margin-top: 2px;")
+        right_form.addRow(voice_title)
+        right_form.addRow("Pitch", self.pitch_label)
+        right_form.addRow("Resonance", self.resonance_label)
+        right_form.addRow("Confidence", self.confidence_label)
+        right_form.addRow("Voiced", self.voice_label)
+        right_form.addRow("RMS", self.rms_label)
+        right_form.addRow("Frames", self.frames_label)
 
-        readout_values = [
-            self.pitch_label,
-            self.resonance_label,
-            self.confidence_label,
-            self.rms_label,
-            self.voice_label,
-            self.frames_label,
-            self.raw_f2_label,
-            self.raw_f3_label,
-            self.formants_label,
-        ]
-
-        for row, (name, value_widget) in enumerate(zip(readout_names, readout_values)):
-            name_label = QtWidgets.QLabel(name)
-            name_label.setAlignment(
-                QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTop
-            )
-            name_label.setMinimumWidth(95)
-
-            right_grid.addWidget(name_label, row, 0)
-            right_grid.addWidget(value_widget, row, 1)
-
-        right_grid.setColumnStretch(0, 0)
-        right_grid.setColumnStretch(1, 1)
+        formants_title = QtWidgets.QLabel("Formants")
+        formants_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        formants_title.setStyleSheet("font-weight: 600; margin-top: 6px;")
+        right_form.addRow(formants_title)
+        right_form.addRow("F2", self.raw_f2_label)
+        right_form.addRow("F3", self.raw_f3_label)
+        right_form.addRow("All", self.formants_label)
 
         right_layout.addWidget(controls, stretch=1)
         root_layout.addWidget(right_panel, stretch=2)
