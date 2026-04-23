@@ -66,11 +66,8 @@ class MainWindow(QtWidgets.QWidget):
         self.main_plot.setYRange(0.0, 1.0)
         self.main_plot.showGrid(x=True, y=True, alpha=0.25)
 
-        self.trail_curve = self.main_plot.plot(
-            pen=None,
-            symbol="o",
-            symbolSize=6,
-        )
+        self.trail_curve = pg.ScatterPlotItem(size=6, pen=None)
+        self.main_plot.addItem(self.trail_curve)
         self.current_point = self.main_plot.plot(
             pen=None,
             symbol="o",
@@ -143,7 +140,7 @@ class MainWindow(QtWidgets.QWidget):
         self.noise_mix_box = QtWidgets.QDoubleSpinBox()
         self.noise_mix_box.setRange(0.0, 1.0)
         self.noise_mix_box.setDecimals(2)
-        self.noise_mix_box.setSingleStep(0.05)
+        self.noise_mix_box.setSingleStep(0.01)
         self.noise_mix_box.setValue(self.config.noise_suppression_mix)
 
         #
@@ -618,7 +615,19 @@ class MainWindow(QtWidgets.QWidget):
         x = np.asarray(self.pitch_history, dtype=float)
         y = np.asarray(self.resonance_history, dtype=float)
 
-        self.trail_curve.setData(x, y)
+        n = len(x)
+        spots = []
+
+        for i, (px, py) in enumerate(zip(x, y)):
+            alpha = int(40 + 180 * (i + 1) / n)  # older = lighter, newer = darker
+            spots.append(
+                {
+                    "pos": (px, py),
+                    "brush": pg.mkBrush(0, 0, 0, alpha),
+                }
+            )
+
+        self.trail_curve.setData(spots)
         self.current_point.setData([x[-1]], [y[-1]])
 
     def start_audio(self) -> None:
@@ -660,4 +669,3 @@ def run() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(run())
-

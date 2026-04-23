@@ -36,7 +36,7 @@ class AnalysisConfig:
     pre_emphasis_from_hz: float = 50.0
 
     noise_suppression_enabled: bool = False
-    noise_suppression_mix: float = 0.5
+    noise_suppression_mix: float = 0.05
 
 
 @dataclass(frozen=True)
@@ -164,4 +164,3 @@ class RealtimeAnalyzer:
             pitch_hz=pitch_hz,
             formants_hz=formants,
         )
-

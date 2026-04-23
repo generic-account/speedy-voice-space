@@ -29,6 +29,5 @@ python3 ui.py
 - Higher window lengths will be less responsive but more accurate.
 
 ## TODO:
-- Background noise reduction
 - Better defaults
 - prettier graphs (older pts dimmer)
