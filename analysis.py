@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from typing import Callable, Deque, List, Optional
+from denoise import BypassPreprocessor, DenoiseSettings, RNNoisePreprocessor
 
 import numpy as np
 import parselmouth
@@ -34,6 +35,9 @@ class AnalysisConfig:
     window_length_s: float = 0.025
     pre_emphasis_from_hz: float = 50.0
 
+    noise_suppression_enabled: bool = False
+    noise_suppression_mix: float = 0.5
+
 
 @dataclass(frozen=True)
 class AnalysisResult:
@@ -51,12 +55,21 @@ def rms(frame: np.ndarray) -> float:
 class RealtimeAnalyzer:
     def __init__(self, config: AnalysisConfig) -> None:
         self.config = config
+        self._speech_prob = 0.0
+        self.preprocessor = RNNoisePreprocessor(
+            DenoiseSettings(
+                enabled=self.config.noise_suppression_enabled,
+                mix=self.config.noise_suppression_mix,
+            )
+        )
         self.frames_seen = 0
         self._result_callback: Optional[Callable[[AnalysisResult], None]] = None
         self._init_buffer()
 
     def _init_buffer(self) -> None:
-        maxlen = max(1, int(round(self.config.buffer_duration_s * self.config.samplerate)))
+        maxlen = max(
+            1, int(round(self.config.buffer_duration_s * self.config.samplerate))
+        )
         self._buffer: Deque[float] = deque(maxlen=maxlen)
 
     def set_result_callback(self, callback: Callable[[AnalysisResult], None]) -> None:
@@ -64,15 +77,26 @@ class RealtimeAnalyzer:
 
     def update_config(self, config: AnalysisConfig) -> None:
         self.config = config
+        self.preprocessor.update_settings(
+            DenoiseSettings(
+                enabled=self.config.noise_suppression_enabled,
+                mix=self.config.noise_suppression_mix,
+            )
+        )
         self.reset()
 
     def reset(self) -> None:
         self.frames_seen = 0
+        self.preprocessor.reset()
         self._init_buffer()
 
     def push_audio(self, block: np.ndarray) -> Optional[AnalysisResult]:
-        mono = np.asarray(block, dtype=np.float64).reshape(-1)
-        self._buffer.extend(mono.tolist())
+        mono = np.asarray(block, dtype=np.float32).reshape(-1)
+        processed, speech_prob = self.preprocessor.process_block(
+            mono, self.config.samplerate
+        )
+        self._speech_prob = speech_prob
+        self._buffer.extend(processed.astype(np.float64).tolist())
         self.frames_seen += 1
 
         if len(self._buffer) < 32:
@@ -140,3 +164,4 @@ class RealtimeAnalyzer:
             pitch_hz=pitch_hz,
             formants_hz=formants,
         )
+

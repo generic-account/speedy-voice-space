@@ -136,6 +136,16 @@ class MainWindow(QtWidgets.QWidget):
 
         right_layout.addWidget(formant_graphs_box, stretch=0)
 
+        # Noise Suppression
+        self.noise_suppression_box = QtWidgets.QCheckBox()
+        self.noise_suppression_box.setChecked(self.config.noise_suppression_enabled)
+
+        self.noise_mix_box = QtWidgets.QDoubleSpinBox()
+        self.noise_mix_box.setRange(0.0, 1.0)
+        self.noise_mix_box.setDecimals(2)
+        self.noise_mix_box.setSingleStep(0.05)
+        self.noise_mix_box.setValue(self.config.noise_suppression_mix)
+
         #
         # Bottom-right: controls and readouts
         #
@@ -313,7 +323,9 @@ class MainWindow(QtWidgets.QWidget):
         ]
 
         for label in readout_value_labels:
-            label.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+            label.setTextInteractionFlags(
+                QtCore.Qt.TextInteractionFlag.TextSelectableByMouse
+            )
             label.setAlignment(
                 QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter
             )
@@ -330,6 +342,8 @@ class MainWindow(QtWidgets.QWidget):
         left_form.addRow("Block Size", self.block_size_box)
         left_form.addRow("Buffer Duration (s)", self.buffer_duration_box)
         left_form.addRow("RMS Threshold", self.threshold_box)
+        left_form.addRow("Noise Suppression", self.noise_suppression_box)
+        left_form.addRow("Noise Suppression Mix", self.noise_mix_box)
 
         left_form.addRow("Pitch Floor (Hz)", self.pitch_floor_box)
         left_form.addRow("Pitch Ceiling (Hz)", self.pitch_ceiling_box)
@@ -478,6 +492,8 @@ class MainWindow(QtWidgets.QWidget):
             maximum_formant_hz=float(self.maximum_formant_box.value()),
             window_length_s=float(self.window_length_box.value()),
             pre_emphasis_from_hz=float(self.pre_emphasis_box.value()),
+            noise_suppression_enabled=bool(self.noise_suppression_box.isChecked()),
+            noise_suppression_mix=float(self.noise_mix_box.value()),
         )
 
     def _read_processing_settings_from_controls(self) -> ProcessingSettings:
@@ -584,7 +600,9 @@ class MainWindow(QtWidgets.QWidget):
             self.raw_f3_label.setText(f"{state.raw_f3_hz:.1f} Hz")
 
         if state.formants_hz:
-            self.formants_label.setText(", ".join(f"{f:.0f}" for f in state.formants_hz[:5]))
+            self.formants_label.setText(
+                ", ".join(f"{f:.0f}" for f in state.formants_hz[:5])
+            )
         else:
             self.formants_label.setText("missing")
 
@@ -642,3 +660,4 @@ def run() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(run())
+
