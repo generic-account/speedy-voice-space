@@ -4,6 +4,25 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Callable, Deque, List, Optional
 from denoise import BypassPreprocessor, DenoiseSettings, RNNoisePreprocessor
+from settings_defaults import (
+    DEFAULT_BLOCK_SIZE,
+    DEFAULT_BUFFER_DURATION_S,
+    DEFAULT_FORMANT_TIME_STEP,
+    DEFAULT_MAX_NUMBER_OF_FORMANTS,
+    DEFAULT_MAXIMUM_FORMANT_HZ,
+    DEFAULT_NOISE_SUPPRESSION_ENABLED,
+    DEFAULT_NOISE_SUPPRESSION_MIX,
+    DEFAULT_PITCH_CEILING_HZ,
+    DEFAULT_PITCH_FLOOR_HZ,
+    DEFAULT_PITCH_SILENCE_THRESHOLD,
+    DEFAULT_PITCH_TIME_STEP,
+    DEFAULT_PITCH_VERY_ACCURATE,
+    DEFAULT_PITCH_VOICING_THRESHOLD,
+    DEFAULT_PRE_EMPHASIS_FROM_HZ,
+    DEFAULT_RMS_THRESHOLD,
+    DEFAULT_SAMPLERATE,
+    DEFAULT_WINDOW_LENGTH_S,
+)
 
 import numpy as np
 import parselmouth
@@ -11,32 +30,32 @@ import parselmouth
 
 @dataclass(frozen=True)
 class AnalysisConfig:
-    samplerate: int = 48000
+    samplerate: int = DEFAULT_SAMPLERATE
 
     # Streaming / buffering
-    block_size: int = 1024
-    buffer_duration_s: float = 0.06  # rolling analysis buffer in seconds
+    block_size: int = DEFAULT_BLOCK_SIZE
+    buffer_duration_s: float = DEFAULT_BUFFER_DURATION_S  # rolling analysis buffer in seconds
 
     # Gating
-    rms_threshold: float = 0.0005
+    rms_threshold: float = DEFAULT_RMS_THRESHOLD
 
     # Pitch (Praat / Parselmouth)
-    pitch_time_step: float = 0.01
-    pitch_floor_hz: float = 75.0
-    pitch_ceiling_hz: float = 400.0
-    pitch_silence_threshold: float = 0.03
-    pitch_voicing_threshold: float = 0.45
-    pitch_very_accurate: bool = False
+    pitch_time_step: float = DEFAULT_PITCH_TIME_STEP
+    pitch_floor_hz: float = DEFAULT_PITCH_FLOOR_HZ
+    pitch_ceiling_hz: float = DEFAULT_PITCH_CEILING_HZ
+    pitch_silence_threshold: float = DEFAULT_PITCH_SILENCE_THRESHOLD
+    pitch_voicing_threshold: float = DEFAULT_PITCH_VOICING_THRESHOLD
+    pitch_very_accurate: bool = DEFAULT_PITCH_VERY_ACCURATE
 
     # Formants (Praat Burg)
-    formant_time_step: float = 0.005
-    max_number_of_formants: float = 5.0
-    maximum_formant_hz: float = 5500.0
-    window_length_s: float = 0.025
-    pre_emphasis_from_hz: float = 50.0
+    formant_time_step: float = DEFAULT_FORMANT_TIME_STEP
+    max_number_of_formants: float = DEFAULT_MAX_NUMBER_OF_FORMANTS
+    maximum_formant_hz: float = DEFAULT_MAXIMUM_FORMANT_HZ
+    window_length_s: float = DEFAULT_WINDOW_LENGTH_S
+    pre_emphasis_from_hz: float = DEFAULT_PRE_EMPHASIS_FROM_HZ
 
-    noise_suppression_enabled: bool = False
-    noise_suppression_mix: float = 0.05
+    noise_suppression_enabled: bool = DEFAULT_NOISE_SUPPRESSION_ENABLED
+    noise_suppression_mix: float = DEFAULT_NOISE_SUPPRESSION_MIX
 
 
 @dataclass(frozen=True)

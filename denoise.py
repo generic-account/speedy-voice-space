@@ -7,6 +7,12 @@ import numpy as np
 from scipy.signal import resample_poly
 
 from pyrnnoise import RNNoise
+from settings_defaults import (
+    DEFAULT_DENOISE_FRAME_SIZE,
+    DEFAULT_DENOISE_TARGET_SAMPLE_RATE,
+    DEFAULT_NOISE_SUPPRESSION_ENABLED,
+    DEFAULT_NOISE_SUPPRESSION_MIX,
+)
 
 
 def clamp(lo: float, hi: float, x: float) -> float:
@@ -15,10 +21,10 @@ def clamp(lo: float, hi: float, x: float) -> float:
 
 @dataclass(frozen=True)
 class DenoiseSettings:
-    enabled: bool = False
-    mix: float = 0.05
-    target_sample_rate: int = 48000
-    frame_size: int = 480  # RNNoise native frame size at 48 kHz
+    enabled: bool = DEFAULT_NOISE_SUPPRESSION_ENABLED
+    mix: float = DEFAULT_NOISE_SUPPRESSION_MIX
+    target_sample_rate: int = DEFAULT_DENOISE_TARGET_SAMPLE_RATE
+    frame_size: int = DEFAULT_DENOISE_FRAME_SIZE  # RNNoise native frame size at 48 kHz
 
 
 class AudioPreprocessor:

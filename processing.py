@@ -7,24 +7,36 @@ from typing import Deque, Optional, Sequence
 import math
 
 from analysis import AnalysisResult
+from settings_defaults import (
+    DEFAULT_F2_HIGH_HZ,
+    DEFAULT_F2_LOW_HZ,
+    DEFAULT_F2_WEIGHT,
+    DEFAULT_F3_HIGH_HZ,
+    DEFAULT_F3_LOW_HZ,
+    DEFAULT_F3_WEIGHT,
+    DEFAULT_PITCH_ALPHA,
+    DEFAULT_PITCH_MEDIAN_WINDOW,
+    DEFAULT_RESONANCE_ALPHA,
+    DEFAULT_RESONANCE_MEDIAN_WINDOW,
+)
 
 
 @dataclass(frozen=True)
 class ProcessingSettings:
-    pitch_median_window: int = 5
-    resonance_median_window: int = 7
-    pitch_alpha: float = 0.25
-    resonance_alpha: float = 0.15
+    pitch_median_window: int = DEFAULT_PITCH_MEDIAN_WINDOW
+    resonance_median_window: int = DEFAULT_RESONANCE_MEDIAN_WINDOW
+    pitch_alpha: float = DEFAULT_PITCH_ALPHA
+    resonance_alpha: float = DEFAULT_RESONANCE_ALPHA
 
     # Resonance normalization ranges
-    f2_low_hz: float = 600.0
-    f2_high_hz: float = 3000.0
-    f3_low_hz: float = 1500.0
-    f3_high_hz: float = 4500.0
+    f2_low_hz: float = DEFAULT_F2_LOW_HZ
+    f2_high_hz: float = DEFAULT_F2_HIGH_HZ
+    f3_low_hz: float = DEFAULT_F3_LOW_HZ
+    f3_high_hz: float = DEFAULT_F3_HIGH_HZ
 
     # Weighted contribution to resonance score
-    f2_weight: float = 0.6
-    f3_weight: float = 0.4
+    f2_weight: float = DEFAULT_F2_WEIGHT
+    f3_weight: float = DEFAULT_F3_WEIGHT
 
 
 @dataclass(frozen=True)

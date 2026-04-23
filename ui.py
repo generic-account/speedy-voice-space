@@ -17,6 +17,10 @@ class AnalysisEmitter(QtCore.QObject):
     result_ready = QtCore.pyqtSignal(object)
 
 
+DEFAULT_ANALYSIS_CONFIG = AnalysisConfig()
+DEFAULT_PROCESSING_SETTINGS = ProcessingSettings()
+
+
 class MainWindow(QtWidgets.QWidget):
     def __init__(self, config: Optional[AnalysisConfig] = None) -> None:
         super().__init__()
@@ -244,51 +248,57 @@ class MainWindow(QtWidgets.QWidget):
 
         self.pitch_median_window_box = QtWidgets.QSpinBox()
         self.pitch_median_window_box.setRange(1, 15)
-        self.pitch_median_window_box.setValue(5)
+        self.pitch_median_window_box.setValue(
+            DEFAULT_PROCESSING_SETTINGS.pitch_median_window
+        )
 
         self.resonance_median_window_box = QtWidgets.QSpinBox()
         self.resonance_median_window_box.setRange(1, 15)
-        self.resonance_median_window_box.setValue(7)
+        self.resonance_median_window_box.setValue(
+            DEFAULT_PROCESSING_SETTINGS.resonance_median_window
+        )
 
         self.pitch_smoothing_box = QtWidgets.QDoubleSpinBox()
         self.pitch_smoothing_box.setRange(0.01, 1.00)
         self.pitch_smoothing_box.setDecimals(2)
         self.pitch_smoothing_box.setSingleStep(0.05)
-        self.pitch_smoothing_box.setValue(0.25)
+        self.pitch_smoothing_box.setValue(DEFAULT_PROCESSING_SETTINGS.pitch_alpha)
 
         self.resonance_smoothing_box = QtWidgets.QDoubleSpinBox()
         self.resonance_smoothing_box.setRange(0.01, 1.00)
         self.resonance_smoothing_box.setDecimals(2)
         self.resonance_smoothing_box.setSingleStep(0.05)
-        self.resonance_smoothing_box.setValue(0.15)
+        self.resonance_smoothing_box.setValue(
+            DEFAULT_PROCESSING_SETTINGS.resonance_alpha
+        )
 
         self.f2_low_box = QtWidgets.QSpinBox()
         self.f2_low_box.setRange(200, 10000)
-        self.f2_low_box.setValue(600)
+        self.f2_low_box.setValue(int(DEFAULT_PROCESSING_SETTINGS.f2_low_hz))
 
         self.f2_high_box = QtWidgets.QSpinBox()
         self.f2_high_box.setRange(200, 10000)
-        self.f2_high_box.setValue(3000)
+        self.f2_high_box.setValue(int(DEFAULT_PROCESSING_SETTINGS.f2_high_hz))
 
         self.f3_low_box = QtWidgets.QSpinBox()
         self.f3_low_box.setRange(500, 12000)
-        self.f3_low_box.setValue(1500)
+        self.f3_low_box.setValue(int(DEFAULT_PROCESSING_SETTINGS.f3_low_hz))
 
         self.f3_high_box = QtWidgets.QSpinBox()
         self.f3_high_box.setRange(500, 12000)
-        self.f3_high_box.setValue(4500)
+        self.f3_high_box.setValue(int(DEFAULT_PROCESSING_SETTINGS.f3_high_hz))
 
         self.f2_weight_box = QtWidgets.QDoubleSpinBox()
         self.f2_weight_box.setRange(0.0, 1.0)
         self.f2_weight_box.setDecimals(2)
         self.f2_weight_box.setSingleStep(0.05)
-        self.f2_weight_box.setValue(0.60)
+        self.f2_weight_box.setValue(DEFAULT_PROCESSING_SETTINGS.f2_weight)
 
         self.f3_weight_box = QtWidgets.QDoubleSpinBox()
         self.f3_weight_box.setRange(0.0, 1.0)
         self.f3_weight_box.setDecimals(2)
         self.f3_weight_box.setSingleStep(0.05)
-        self.f3_weight_box.setValue(0.40)
+        self.f3_weight_box.setValue(DEFAULT_PROCESSING_SETTINGS.f3_weight)
 
         self.start_button = QtWidgets.QPushButton("Start")
         self.stop_button = QtWidgets.QPushButton("Stop")
@@ -478,7 +488,7 @@ class MainWindow(QtWidgets.QWidget):
             block_size=int(self.block_size_box.value()),
             buffer_duration_s=float(self.buffer_duration_box.value()),
             rms_threshold=float(self.threshold_box.value()),
-            pitch_time_step=0.01,
+            pitch_time_step=DEFAULT_ANALYSIS_CONFIG.pitch_time_step,
             pitch_floor_hz=pitch_floor,
             pitch_ceiling_hz=pitch_ceiling,
             pitch_silence_threshold=float(self.pitch_silence_box.value()),
@@ -507,7 +517,8 @@ class MainWindow(QtWidgets.QWidget):
         f2_weight = float(self.f2_weight_box.value())
         f3_weight = float(self.f3_weight_box.value())
         if (f2_weight + f3_weight) <= 0:
-            f2_weight, f3_weight = 0.6, 0.4
+            f2_weight = DEFAULT_PROCESSING_SETTINGS.f2_weight
+            f3_weight = DEFAULT_PROCESSING_SETTINGS.f3_weight
 
         return ProcessingSettings(
             pitch_median_window=int(self.pitch_median_window_box.value()),
