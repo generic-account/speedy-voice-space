@@ -3,7 +3,11 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from typing import Callable, Deque, List, Optional
-from denoise import DenoiseSettings, RNNoisePreprocessor
+
+# NOTE: `denoise` (pyrnnoise/RNNoise) is imported lazily inside RealtimeAnalyzer
+# so that the pure `analyze_window` contract — and the parity oracle that uses it
+# — can run without the optional noise-suppression stack installed. Noise
+# suppression is being reimplemented in Rust/WASM (nnnoiseless) in the rewrite.
 from settings_defaults import (
     DEFAULT_BLOCK_SIZE,
     DEFAULT_BUFFER_DURATION_S,
@@ -71,15 +75,85 @@ def rms(frame: np.ndarray) -> float:
     return float(np.sqrt(np.mean(np.square(frame)) + 1e-12))
 
 
+def analyze_window(frame: np.ndarray, config: AnalysisConfig) -> AnalysisResult:
+    """
+    Pure, stateless pitch + formant analysis of a single analysis window.
+
+    This is the algorithmic contract that the WebAssembly (Rust) port must match.
+    It is deliberately free of streaming/buffering/denoising state so the same
+    `(frame, config)` can be fed to both Python (Praat/Parselmouth) and the port
+    to check numerical equivalency. See tools/oracle/.
+
+    `frame` is mono float at `config.samplerate`. Returns the values at the
+    window midpoint (mirrors the realtime path).
+    """
+    frame = np.asarray(frame, dtype=np.float64).reshape(-1)
+    current_rms = rms(frame)
+
+    if current_rms < config.rms_threshold:
+        return AnalysisResult(
+            voiced=False,
+            rms=current_rms,
+            pitch_hz=None,
+            formants_hz=[],
+        )
+
+    snd = parselmouth.Sound(frame, sampling_frequency=float(config.samplerate))
+
+    # Pitch
+    pitch_obj = snd.to_pitch_ac(
+        time_step=config.pitch_time_step,
+        pitch_floor=config.pitch_floor_hz,
+        very_accurate=config.pitch_very_accurate,
+        silence_threshold=config.pitch_silence_threshold,
+        voicing_threshold=config.pitch_voicing_threshold,
+        pitch_ceiling=config.pitch_ceiling_hz,
+    )
+
+    t = snd.get_total_duration() / 2.0
+    pitch_hz = pitch_obj.get_value_at_time(t)
+    if pitch_hz is None or (isinstance(pitch_hz, float) and np.isnan(pitch_hz)):
+        pitch_hz = None
+        voiced = False
+    else:
+        pitch_hz = float(pitch_hz)
+        voiced = True
+
+    # Formants
+    formant_obj = snd.to_formant_burg(
+        time_step=config.formant_time_step,
+        max_number_of_formants=config.max_number_of_formants,
+        maximum_formant=config.maximum_formant_hz,
+        window_length=config.window_length_s,
+        pre_emphasis_from=config.pre_emphasis_from_hz,
+    )
+
+    formants: List[float] = []
+    for i in range(1, int(config.max_number_of_formants) + 1):
+        value = formant_obj.get_value_at_time(i, t)
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            continue
+        formants.append(float(value))
+
+    return AnalysisResult(
+        voiced=voiced,
+        rms=current_rms,
+        pitch_hz=pitch_hz,
+        formants_hz=formants,
+    )
+
+
 class RealtimeAnalyzer:
     def __init__(self, config: AnalysisConfig) -> None:
         self.config = config
+        from denoise import RNNoisePreprocessor  # lazy: optional noise stack
         self.preprocessor = RNNoisePreprocessor(self._denoise_settings())
         self.frames_seen = 0
         self._result_callback: Optional[Callable[[AnalysisResult], None]] = None
         self._init_buffer()
 
-    def _denoise_settings(self) -> DenoiseSettings:
+    def _denoise_settings(self):
+        from denoise import DenoiseSettings  # lazy: optional noise stack
         return DenoiseSettings(
             enabled=self.config.noise_suppression_enabled,
             mix=self.config.noise_suppression_mix,
@@ -122,56 +196,5 @@ class RealtimeAnalyzer:
         return result
 
     def analyze_frame(self, frame: np.ndarray) -> AnalysisResult:
-        current_rms = rms(frame)
-
-        if current_rms < self.config.rms_threshold:
-            return AnalysisResult(
-                voiced=False,
-                rms=current_rms,
-                pitch_hz=None,
-                formants_hz=[],
-            )
-
-        snd = parselmouth.Sound(frame, sampling_frequency=float(self.config.samplerate))
-
-        # Pitch
-        pitch_obj = snd.to_pitch_ac(
-            time_step=self.config.pitch_time_step,
-            pitch_floor=self.config.pitch_floor_hz,
-            very_accurate=self.config.pitch_very_accurate,
-            silence_threshold=self.config.pitch_silence_threshold,
-            voicing_threshold=self.config.pitch_voicing_threshold,
-            pitch_ceiling=self.config.pitch_ceiling_hz,
-        )
-
-        t = snd.get_total_duration() / 2.0
-        pitch_hz = pitch_obj.get_value_at_time(t)
-        if pitch_hz is None or (isinstance(pitch_hz, float) and np.isnan(pitch_hz)):
-            pitch_hz = None
-            voiced = False
-        else:
-            pitch_hz = float(pitch_hz)
-            voiced = True
-
-        # Formants
-        formant_obj = snd.to_formant_burg(
-            time_step=self.config.formant_time_step,
-            max_number_of_formants=self.config.max_number_of_formants,
-            maximum_formant=self.config.maximum_formant_hz,
-            window_length=self.config.window_length_s,
-            pre_emphasis_from=self.config.pre_emphasis_from_hz,
-        )
-
-        formants: List[float] = []
-        for i in range(1, int(self.config.max_number_of_formants) + 1):
-            value = formant_obj.get_value_at_time(i, t)
-            if value is None or (isinstance(value, float) and np.isnan(value)):
-                continue
-            formants.append(float(value))
-
-        return AnalysisResult(
-            voiced=voiced,
-            rms=current_rms,
-            pitch_hz=pitch_hz,
-            formants_hz=formants,
-        )
+        # Delegates to the pure, stateless contract shared with the WASM port.
+        return analyze_window(frame, self.config)

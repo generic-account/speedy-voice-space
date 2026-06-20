@@ -208,3 +208,18 @@ marimo/_lsp/
 __marimo__/
 
 .codex*
+
+# --- web rewrite ---
+# macOS
+.DS_Store
+web/node_modules/
+web/dist/
+# wasm-pack output (rebuilt by CI / `wasm-pack build`); also has its own .gitignore
+web/src/dsp/
+# Rust build
+dsp/target/
+
+# User voice recordings (privacy) + experiment data derived from them.
+# Regenerate synthetic fixtures: python tools/audio/gen_fixtures.py
+tools/audio/fixtures/rec_*.wav
+tools/experiments/data/

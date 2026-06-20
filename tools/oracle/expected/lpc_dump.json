@@ -1,0 +1,350 @@
+{
+  "vowel_u_130hz": {
+    "config": {
+      "samplerate": 48000,
+      "block_size": 1024,
+      "buffer_duration_s": 0.06,
+      "rms_threshold": 0.0005,
+      "pitch_time_step": 0.01,
+      "pitch_floor_hz": 75.0,
+      "pitch_ceiling_hz": 400.0,
+      "pitch_silence_threshold": 0.03,
+      "pitch_voicing_threshold": 0.45,
+      "pitch_very_accurate": false,
+      "formant_time_step": 0.005,
+      "max_number_of_formants": 5.0,
+      "maximum_formant_hz": 5500.0,
+      "window_length_s": 0.025,
+      "pre_emphasis_from_hz": 50.0,
+      "noise_suppression_enabled": false,
+      "noise_suppression_mix": 0.05
+    },
+    "samplerate": 48000,
+    "sample_scale": 32768,
+    "entries": [
+      {
+        "window_index": 0,
+        "start_sample": 0,
+        "window_samples": 2880,
+        "new_fs": 11000.0,
+        "order": 10,
+        "praat_lpc": [
+          -3.721066952814743,
+          6.417419547344449,
+          -6.454154743447593,
+          2.938186650485372,
+          2.279822343688095,
+          -5.6219441119386735,
+          5.5366138399981395,
+          -3.454600119284973,
+          1.335387415837712,
+          -0.2261737530030842
+        ],
+        "praat_formant_freq_hz": [
+          437.0735,
+          824.2704,
+          2345.7701,
+          2490.2226
+        ],
+        "praat_formant_bw_hz": [
+          168.7709,
+          89.2585,
+          373.2153,
+          543.3096
+        ]
+      },
+      {
+        "window_index": 29,
+        "start_sample": 69600,
+        "window_samples": 2880,
+        "new_fs": 11000.0,
+        "order": 10,
+        "praat_lpc": [
+          -3.709200263158689,
+          6.352483564049336,
+          -6.272696955524531,
+          2.6090885297825546,
+          2.699185988127453,
+          -6.0096612640330775,
+          5.794190985049119,
+          -3.5674665091968967,
+          1.3609863272239058,
+          -0.22710836714220217
+        ],
+        "praat_formant_freq_hz": [
+          438.6173,
+          824.8333,
+          2336.1872,
+          2489.4051
+        ],
+        "praat_formant_bw_hz": [
+          169.8051,
+          90.9523,
+          398.9298,
+          499.513
+        ]
+      }
+    ]
+  },
+  "vowel_u_nasal_130hz": {
+    "config": {
+      "samplerate": 48000,
+      "block_size": 1024,
+      "buffer_duration_s": 0.06,
+      "rms_threshold": 0.0005,
+      "pitch_time_step": 0.01,
+      "pitch_floor_hz": 75.0,
+      "pitch_ceiling_hz": 400.0,
+      "pitch_silence_threshold": 0.03,
+      "pitch_voicing_threshold": 0.45,
+      "pitch_very_accurate": false,
+      "formant_time_step": 0.005,
+      "max_number_of_formants": 5.0,
+      "maximum_formant_hz": 5500.0,
+      "window_length_s": 0.025,
+      "pre_emphasis_from_hz": 50.0,
+      "noise_suppression_enabled": false,
+      "noise_suppression_mix": 0.05
+    },
+    "samplerate": 48000,
+    "sample_scale": 32768,
+    "entries": [
+      {
+        "window_index": 0,
+        "start_sample": 0,
+        "window_samples": 2880,
+        "new_fs": 11000.0,
+        "order": 10,
+        "praat_lpc": [
+          -3.6251237186943865,
+          4.93801815072894,
+          -2.299402681046258,
+          -1.973187879784382,
+          4.259084480776533,
+          -3.499075626877199,
+          1.324849192459871,
+          -0.07610632140749486,
+          -0.014111300231060341,
+          -0.030936399174178564
+        ],
+        "praat_formant_freq_hz": [
+          336.6828,
+          747.7205,
+          2320.0681,
+          4305.8175
+        ],
+        "praat_formant_bw_hz": [
+          64.6002,
+          171.9682,
+          490.6852,
+          5441.1631
+        ]
+      },
+      {
+        "window_index": 29,
+        "start_sample": 69600,
+        "window_samples": 2880,
+        "new_fs": 11000.0,
+        "order": 10,
+        "praat_lpc": [
+          -3.5881539728466176,
+          4.765992045000618,
+          -1.959039955964183,
+          -2.314781544862948,
+          4.351797016513137,
+          -3.284515894914416,
+          1.0152176289306918,
+          0.10321293662506503,
+          -0.05447063686634665,
+          -0.03126207809612092
+        ],
+        "praat_formant_freq_hz": [
+          337.4252,
+          748.9205,
+          2311.8379,
+          3912.1797
+        ],
+        "praat_formant_bw_hz": [
+          64.7578,
+          168.9649,
+          473.7028,
+          5136.49
+        ]
+      }
+    ]
+  },
+  "vowel_a_res_130hz": {
+    "config": {
+      "samplerate": 48000,
+      "block_size": 1024,
+      "buffer_duration_s": 0.06,
+      "rms_threshold": 0.0005,
+      "pitch_time_step": 0.01,
+      "pitch_floor_hz": 75.0,
+      "pitch_ceiling_hz": 400.0,
+      "pitch_silence_threshold": 0.03,
+      "pitch_voicing_threshold": 0.45,
+      "pitch_very_accurate": false,
+      "formant_time_step": 0.005,
+      "max_number_of_formants": 5.0,
+      "maximum_formant_hz": 5500.0,
+      "window_length_s": 0.025,
+      "pre_emphasis_from_hz": 50.0,
+      "noise_suppression_enabled": false,
+      "noise_suppression_mix": 0.05
+    },
+    "samplerate": 48000,
+    "sample_scale": 32768,
+    "entries": [
+      {
+        "window_index": 0,
+        "start_sample": 0,
+        "window_samples": 2880,
+        "new_fs": 11000.0,
+        "order": 10,
+        "praat_lpc": [
+          -3.6541839226947688,
+          6.954949470567029,
+          -8.604156151398831,
+          7.405011608323696,
+          -4.035372195938638,
+          0.925260665195892,
+          0.5137551389295204,
+          -0.5510477395319963,
+          0.2273460674148901,
+          -0.00735387266620472
+        ],
+        "praat_formant_freq_hz": [
+          771.8466,
+          1098.7366,
+          2193.9902,
+          2470.5407
+        ],
+        "praat_formant_bw_hz": [
+          79.8891,
+          84.5846,
+          1091.8435,
+          192.4373
+        ]
+      },
+      {
+        "window_index": 29,
+        "start_sample": 69600,
+        "window_samples": 2880,
+        "new_fs": 11000.0,
+        "order": 10,
+        "praat_lpc": [
+          -3.5631895257703756,
+          6.518412979641772,
+          -7.507599944228276,
+          5.5182093935006185,
+          -1.5989758084703969,
+          -1.4956764917966718,
+          2.3654675520578645,
+          -1.613677629859744,
+          0.6445709406262594,
+          -0.09271203462106811
+        ],
+        "praat_formant_freq_hz": [
+          778.2333,
+          1104.7849,
+          2310.3774,
+          2483.6096
+        ],
+        "praat_formant_bw_hz": [
+          81.7148,
+          84.8166,
+          786.3828,
+          253.8281
+        ]
+      }
+    ]
+  },
+  "vowel_a_nasal_130hz": {
+    "config": {
+      "samplerate": 48000,
+      "block_size": 1024,
+      "buffer_duration_s": 0.06,
+      "rms_threshold": 0.0005,
+      "pitch_time_step": 0.01,
+      "pitch_floor_hz": 75.0,
+      "pitch_ceiling_hz": 400.0,
+      "pitch_silence_threshold": 0.03,
+      "pitch_voicing_threshold": 0.45,
+      "pitch_very_accurate": false,
+      "formant_time_step": 0.005,
+      "max_number_of_formants": 5.0,
+      "maximum_formant_hz": 5500.0,
+      "window_length_s": 0.025,
+      "pre_emphasis_from_hz": 50.0,
+      "noise_suppression_enabled": false,
+      "noise_suppression_mix": 0.05
+    },
+    "samplerate": 48000,
+    "sample_scale": 32768,
+    "entries": [
+      {
+        "window_index": 0,
+        "start_sample": 0,
+        "window_samples": 2880,
+        "new_fs": 11000.0,
+        "order": 10,
+        "praat_lpc": [
+          -4.140468391188092,
+          7.9037468765086265,
+          -9.035323465506465,
+          6.328810246233545,
+          -1.5280027867321977,
+          -2.3327939453254816,
+          3.3608587038767364,
+          -2.257002012324669,
+          0.8813751532843055,
+          -0.16908228645005297
+        ],
+        "praat_formant_freq_hz": [
+          604.2274,
+          1008.9993,
+          1920.1252,
+          2637.4567
+        ],
+        "praat_formant_bw_hz": [
+          250.9837,
+          196.6504,
+          1445.1319,
+          425.1126
+        ]
+      },
+      {
+        "window_index": 29,
+        "start_sample": 69600,
+        "window_samples": 2880,
+        "new_fs": 11000.0,
+        "order": 10,
+        "praat_lpc": [
+          -3.992040514258347,
+          7.148590059985198,
+          -7.140289367152427,
+          3.188134765667118,
+          2.313224922021055,
+          -5.9396653191439555,
+          5.960982801036825,
+          -3.6470146014008282,
+          1.3803843307629111,
+          -0.2596672562513215
+        ],
+        "praat_formant_freq_hz": [
+          602.2955,
+          1007.8115,
+          1907.3792,
+          2652.8449
+        ],
+        "praat_formant_bw_hz": [
+          235.8009,
+          185.6113,
+          1257.6749,
+          398.9305
+        ]
+      }
+    ]
+  }
+}

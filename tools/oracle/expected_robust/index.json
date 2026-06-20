@@ -1,0 +1,12 @@
+{
+  "files": [
+    "vowel_a_150hz.json",
+    "vowel_i_220hz.json",
+    "vowel_u_130hz.json",
+    "vowel_a_res_130hz.json",
+    "vowel_u_nasal_130hz.json",
+    "vowel_a_nasal_130hz.json",
+    "real_speech_48k.json",
+    "silence.json"
+  ]
+}

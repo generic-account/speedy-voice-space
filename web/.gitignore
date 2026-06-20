@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.vite/
+playwright-report/
+test-results/
+*.log
+
+# local helper scripts / scratch
+_*.mjs
