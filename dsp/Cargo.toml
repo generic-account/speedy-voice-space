@@ -21,3 +21,9 @@ serde_json = "1"
 [profile.release]
 opt-level = 3
 lto = true
+
+# Skip wasm-pack's bundled wasm-opt: it's too old to parse modern wasm-bindgen
+# output (a second table for reference types -> "Only 1 table allowed in MVP").
+# The binary is already release-optimized by rustc; this just drops the extra pass.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
