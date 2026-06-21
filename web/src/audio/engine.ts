@@ -54,6 +54,21 @@ export class AudioEngine {
   // collected per-frame {candidates, committed, coasted} frames from trackDebugLog.
   trackDebugLog: TrackDebugFrame[] = [];
 
+  // Backpressure: capture runs in real time, but the DSP worker may be slower on
+  // weaker devices. Rather than queue every block (unbounded latency + leftward
+  // strip drift), we keep at most one block in flight and accumulate the rest;
+  // when the worker replies we send it the FRESHEST audio, dropping stale blocks.
+  private busy = false;
+  private pending: Float32Array[] = [];
+  private pendingFrame = 0;
+  private lastCaptureT = 0; // newest captured audio time (s)
+  private lastProcessedT = 0; // newest analyzed audio time (s)
+
+  /** How far analysis lags real-time capture (seconds). Bounded by backpressure. */
+  get backlogS(): number {
+    return Math.max(0, this.lastCaptureT - this.lastProcessedT);
+  }
+
   readonly stats: AudioStats = {
     running: false,
     source: "none",
@@ -147,21 +162,62 @@ export class AudioEngine {
     if (!this.worker) {
       this.worker = new Worker(new URL("./dsp-worker.ts", import.meta.url), { type: "module" });
       this.worker.onmessage = (e: MessageEvent) => {
-        if (e.data?.type === "result") this.onResult?.(e.data.result as AnalysisResult);
+        if (e.data?.type === "result") this.onWorkerReply(e.data.result as AnalysisResult | null);
         else if (e.data?.type === "trackDebug") {
           this.trackDebugLog.push(e.data as TrackDebugFrame);
           if (this.trackDebugLog.length > 5000) this.trackDebugLog.shift();
         }
       };
     }
+    this.resetBackpressure();
     this.config = { ...this.config, samplerate: sampleRate };
     this.worker.postMessage({ type: "init", config: this.config });
+  }
+
+  private resetBackpressure(): void {
+    this.busy = false;
+    this.pending = [];
+    this.lastCaptureT = 0;
+    this.lastProcessedT = 0;
+  }
+
+  // Worker finished a block: surface the result, then feed it the freshest audio
+  // that piled up while it was busy (merged into one block), or go idle.
+  private onWorkerReply(result: AnalysisResult | null): void {
+    if (result) {
+      this.lastProcessedT = result.t;
+      this.onResult?.(result);
+    }
+    if (this.pending.length > 0) {
+      let total = 0;
+      for (const b of this.pending) total += b.length;
+      const merged = new Float32Array(total);
+      let off = 0;
+      for (const b of this.pending) {
+        merged.set(b, off);
+        off += b.length;
+      }
+      this.pending = [];
+      this.sendBlock(merged, this.pendingFrame);
+    } else {
+      this.busy = false;
+    }
+  }
+
+  private sendBlock(samples: Float32Array, frame: number): void {
+    this.busy = true;
+    this.worker?.postMessage({ type: "block", samples, frame }, [samples.buffer]);
   }
 
   /** Toggle per-frame formant-tracker diagnostics (clears the log when enabling). */
   setTrackDebug(on: boolean): void {
     if (on) this.trackDebugLog = [];
     this.worker?.postMessage({ type: "trackDebug", on });
+  }
+
+  /** Diagnostic: simulate slow per-block DSP (ms) to emulate a weaker device. */
+  setProcDelay(ms: number): void {
+    this.worker?.postMessage({ type: "procDelay", ms });
   }
 
   /** Push updated analysis config to the worker (resets its rolling buffer). */
@@ -202,9 +258,16 @@ export class AudioEngine {
     const r = rms(block);
     this.stats.lastRms = r;
     if (r > this.stats.peakRms) this.stats.peakRms = r;
-    // Transfer the buffer to the worker (zero-copy; we're done with it here).
-    // `frame` is the block's capture position from the audio clock (real time).
-    this.worker?.postMessage({ type: "block", samples: block, frame }, [block.buffer]);
+    this.lastCaptureT = frame / this.stats.sampleRate;
+    // If the worker is still chewing on a block, hold this one (and any others)
+    // and let onWorkerReply send the freshest merged audio. Otherwise send now.
+    if (this.busy) {
+      this.pending.push(block);
+      this.pendingFrame = frame;
+    } else {
+      this.pendingFrame = frame;
+      this.sendBlock(block, frame);
+    }
   }
 
   async stop(): Promise<void> {

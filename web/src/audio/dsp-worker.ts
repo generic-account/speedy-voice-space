@@ -17,6 +17,7 @@ let buffer = new Float32Array(2880);
 let filled = 0;
 let captureFrame = 0; // capture position of the latest block (from the audio clock)
 let trackDebug = false; // when on, emit per-frame formant-tracker diagnostics
+let procDelayMs = 0; // test/diagnostic: simulate slow per-block processing
 
 const post = (msg: unknown) => (self as unknown as Worker).postMessage(msg);
 
@@ -128,6 +129,9 @@ self.onmessage = async (e: MessageEvent) => {
     case "trackDebug":
       trackDebug = !!msg.on;
       break;
+    case "procDelay":
+      procDelayMs = Math.max(0, msg.ms | 0);
+      break;
     case "block": {
       if (!ready) break;
       let samples = msg.samples as Float32Array;
@@ -136,8 +140,15 @@ self.onmessage = async (e: MessageEvent) => {
       }
       if (typeof msg.frame === "number") captureFrame = msg.frame;
       appendBlock(samples);
-      const result = analyze();
-      if (result) post({ type: "result", result });
+      if (procDelayMs > 0) {
+        const t0 = performance.now();
+        while (performance.now() - t0 < procDelayMs) {
+          /* busy-wait to emulate slow DSP on a weaker device */
+        }
+      }
+      // Always reply (result may be null) so the main thread can pace work to
+      // the worker's real throughput — see AudioEngine backpressure.
+      post({ type: "result", result: analyze() });
       break;
     }
   }
