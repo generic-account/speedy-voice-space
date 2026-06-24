@@ -16,14 +16,19 @@ interface Props {
 // Shared by the renderer and the zoom/pan math so they can't drift apart.
 const PAD = { l: 58, r: 28, t: 24, b: 32 };
 
-// Pitch (x) vs Resonance (y) scatter with a fading trail. The configured ranges
-// are the "home" view; the wheel zooms, drag pans, and double-click resets.
+const fmtPitch = (v: number) => String(Math.round(v));
+const fmtRes = (v: number) => v.toFixed(2);
+
+// Pitch vs Resonance scatter with a fading trail. The configured ranges are the
+// "home" view; the wheel zooms, drag pans, double-click resets, and the corner
+// button transposes (swaps which variable is on which axis).
 export function MainPlot({ trail, xRange, yRange }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState<{ x: [number, number]; y: [number, number] }>({
     x: xRange,
     y: yRange,
   });
+  const [transposed, setTransposed] = useState(false);
   const [resizeTick, setResizeTick] = useState(0);
 
   // Re-home when the configured range VALUES change (not on every render — the
@@ -64,8 +69,17 @@ export function MainPlot({ trail, xRange, yRange }: Props) {
 
     const [x0, x1] = view.x;
     const [y0, y1] = view.y;
-    const sx = (p: number) => padL + ((p - x0) / (x1 - x0)) * plotW;
-    const sy = (r: number) => padT + (1 - (r - y0) / (y1 - y0)) * plotH;
+    const sx = (v: number) => padL + ((v - x0) / (x1 - x0)) * plotW;
+    const sy = (v: number) => padT + (1 - (v - y0) / (y1 - y0)) * plotH;
+
+    // Which variable sits on each axis, and how to label it.
+    const xIsPitch = !transposed;
+    const xVal = (pt: TrailPoint) => (xIsPitch ? pt.pitch : pt.resonance);
+    const yVal = (pt: TrailPoint) => (xIsPitch ? pt.resonance : pt.pitch);
+    const xFmt = xIsPitch ? fmtPitch : fmtRes;
+    const yFmt = xIsPitch ? fmtRes : fmtPitch;
+    const xTitle = xIsPitch ? "Pitch (Hz)" : "Resonance";
+    const yTitle = xIsPitch ? "Resonance" : "Pitch (Hz)";
 
     ctx.fillStyle = C.canvas;
     ctx.fillRect(padL, padT, plotW, plotH);
@@ -73,37 +87,37 @@ export function MainPlot({ trail, xRange, yRange }: Props) {
     ctx.fillStyle = C.muted;
     ctx.font = "10px system-ui, sans-serif"; // axis numbers
 
-    // X gridlines at "nice" pitch intervals.
-    const xStep = niceStep(x1 - x0, 6);
+    // X gridlines.
+    const xStep = niceStep(x1 - x0, xIsPitch ? 6 : 5);
     ctx.textAlign = "center";
-    for (let p = Math.ceil(x0 / xStep) * xStep; p <= x1; p += xStep) {
-      const X = sx(p);
+    for (let v = Math.ceil(x0 / xStep) * xStep; v <= x1 + 1e-9; v += xStep) {
+      const X = sx(v);
       ctx.beginPath();
       ctx.moveTo(X, padT);
       ctx.lineTo(X, padT + plotH);
       ctx.stroke();
-      ctx.fillText(String(Math.round(p)), X, padT + plotH + 16);
+      ctx.fillText(xFmt(v), X, padT + plotH + 16);
     }
     // Y gridlines.
-    const yStep = niceStep(y1 - y0, 5);
+    const yStep = niceStep(y1 - y0, xIsPitch ? 5 : 6);
     ctx.textAlign = "right";
-    for (let r = Math.ceil(y0 / yStep) * yStep; r <= y1 + 1e-9; r += yStep) {
-      const Y = sy(r);
+    for (let v = Math.ceil(y0 / yStep) * yStep; v <= y1 + 1e-9; v += yStep) {
+      const Y = sy(v);
       ctx.beginPath();
       ctx.moveTo(padL, Y);
       ctx.lineTo(padL + plotW, Y);
       ctx.stroke();
-      ctx.fillText(r.toFixed(2), padL - 6, Y + 4);
+      ctx.fillText(yFmt(v), padL - 6, Y + 4);
     }
 
     ctx.fillStyle = C.text;
     ctx.font = "11px system-ui, sans-serif"; // axis titles
     ctx.textAlign = "center";
-    ctx.fillText("Pitch (Hz)", padL + plotW / 2, h - 6);
+    ctx.fillText(xTitle, padL + plotW / 2, h - 6);
     ctx.save();
     ctx.translate(12, padT + plotH / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText("Resonance", 0, 0);
+    ctx.fillText(yTitle, 0, 0);
     ctx.restore();
 
     // Trail (older = lighter), then current point. Clip to the plot rect.
@@ -116,14 +130,14 @@ export function MainPlot({ trail, xRange, yRange }: Props) {
       const a = (40 + 180 * ((i + 1) / n)) / 255;
       ctx.fillStyle = `rgba(${C.trailRGB},${a})`;
       ctx.beginPath();
-      ctx.arc(sx(trail[i].pitch), sy(trail[i].resonance), 3, 0, Math.PI * 2);
+      ctx.arc(sx(xVal(trail[i])), sy(yVal(trail[i])), 3, 0, Math.PI * 2);
       ctx.fill();
     }
     if (n > 0) {
       const last = trail[n - 1];
       ctx.fillStyle = C.accent;
       ctx.beginPath();
-      ctx.arc(sx(last.pitch), sy(last.resonance), 6, 0, Math.PI * 2);
+      ctx.arc(sx(xVal(last)), sy(yVal(last)), 6, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
@@ -131,8 +145,8 @@ export function MainPlot({ trail, xRange, yRange }: Props) {
     ctx.fillStyle = C.text;
     ctx.font = "bold 13px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("Pitch vs Resonance", padL + plotW / 2, 15);
-  }, [trail, view, resizeTick]);
+    ctx.fillText(xIsPitch ? "Pitch vs Resonance" : "Resonance vs Pitch", padL + plotW / 2, 15);
+  }, [trail, view, resizeTick, transposed]);
 
   // Wheel zoom about the cursor; drag to pan; double-click to reset.
   function onWheel(e: React.WheelEvent) {
@@ -167,17 +181,45 @@ export function MainPlot({ trail, xRange, yRange }: Props) {
   }
 
   return (
-    <canvas
-      ref={ref}
-      data-testid="main-plot"
-      onWheel={onWheel}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onDoubleClick={() => setView({ x: xRange, y: yRange })}
-      title="scroll to zoom · drag to pan · double-click to reset"
-      style={{ width: "100%", height: "100%", display: "block", cursor: "crosshair" }}
-    />
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <canvas
+        ref={ref}
+        data-testid="main-plot"
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onDoubleClick={() =>
+          setView({ x: transposed ? yRange : xRange, y: transposed ? xRange : yRange })
+        }
+        title="scroll to zoom · drag to pan · double-click to reset"
+        style={{ width: "100%", height: "100%", display: "block", cursor: "crosshair" }}
+      />
+      <button
+        data-testid="transpose"
+        onClick={() => {
+          setTransposed((t) => !t);
+          setView((v) => ({ x: v.y, y: v.x })); // swap axes, preserving zoom
+        }}
+        title="Swap axes (transpose)"
+        style={{
+          position: "absolute",
+          left: 6,
+          bottom: 6,
+          width: 24,
+          height: 24,
+          padding: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 14,
+          lineHeight: 1,
+          opacity: 0.75,
+        }}
+      >
+        ⇄
+      </button>
+    </div>
   );
 }
 

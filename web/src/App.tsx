@@ -422,11 +422,11 @@ export default function App() {
           </p>
           <p style={ABOUT_P}>
             Formants represent “peaks” in the frequency spectrum of voice, with F0
-            representing pitch, F1 being associated with vowel height, and the
-            higher formants F2 and above being associated with resonance. The
-            weighted average of normalized F2 and F3 values provides a pretty good
-            heuristic for our perception of resonance, which is what preexisting
-            projects, literature, and I use.
+            representing pitch, F1 being associated with vowel height, F2
+            associated with vowel advancement, and F3 associated with vocal tract
+            length. The weighted average of normalized F2 and F3 values provides a
+            pretty good heuristic for our perception of resonance, which is what
+            preexisting projects, literature, and I use.
           </p>
 
           <h3 style={ABOUT_HEAD}>How to use</h3>
