@@ -1,9 +1,6 @@
-// Formant continuity tracker — assigns each frame's candidate LPC poles to
-// smooth F1<F2<F3 tracks, fixing the slot-jumps that frequency-rank assignment
-// causes. Greedy per-frame (zero latency): pick the candidate→slot assignment
-// minimizing emission (soft prior + bandwidth + missing/coverage) + transition
-// from the last committed frame (saturating |Δf|: cheap within-vowel drift, a
-// real vowel switch still affordable). Ported from tools/experiments/tracker.py.
+// Formant continuity tracker: greedily assigns each frame's candidate LPC poles
+// to smooth F1<F2<F3 slots, minimizing emission + transition cost (zero latency).
+// Ported from tools/experiments/tracker.py.
 
 export interface TrackerParams {
   prior: [number, number][]; // per-slot (center, sigma)
@@ -27,18 +24,14 @@ export const DEFAULT_TRACKER_PARAMS: TrackerParams = {
   wPrior: 0.8,
   wBand: 0.25,
   bandRef: 350,
-  // Cost of leaving a slot empty. Must exceed the capped transition cost
-  // (trans_cap·w_trans = 3.0) enough that following a moving formant beats
-  // dropping it — at 1.4 the jumpy F3 was abandoned on ~⅔ of sustained /a/.
+  // Cost of leaving a slot empty (vs. following a moving formant).
   wMissing: 2.0,
   wCover: 0.6,
   coverBand: [350, 3200],
   wTrans: 1.0,
   transScale: 110,
-  // Cap on the per-slot transition penalty. Kept below the cost of abandoning a
-  // slot (wMissing + null-transition ≈ 2.5) so following a real but fast-moving
-  // formant always beats dropping it — otherwise F3 (variable, esp. on /a/) was
-  // left empty whenever it strayed >~1 transScale from the coasted anchor.
+  // Capped below the slot-empty cost so following a fast-moving formant always
+  // beats dropping it (otherwise F3 was left empty when it strayed far).
   transCap: 1.8,
 };
 

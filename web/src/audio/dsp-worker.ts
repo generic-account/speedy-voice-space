@@ -147,7 +147,7 @@ self.onmessage = async (e: MessageEvent) => {
         }
       }
       // Always reply (result may be null) so the main thread can pace work to
-      // the worker's real throughput — see AudioEngine backpressure.
+      // the worker's real throughput, see AudioEngine backpressure.
       post({ type: "result", result: analyze() });
       break;
     }

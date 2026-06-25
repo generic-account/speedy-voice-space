@@ -40,7 +40,7 @@ export interface AnalysisResult {
   voiced: boolean;
   pitchHz: number | null;
   formantsHz: number[];
-  t: number; // audio time (seconds) of this frame — for clock-driven plotting
+  t: number; // audio time (seconds) of this frame, for clock-driven plotting
 }
 
 export function defaultAnalysisConfig(): AnalysisConfig {

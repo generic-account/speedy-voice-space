@@ -12,7 +12,7 @@ export type Field =
   // Compact 2×3 grid for the F2/F3 Low/High/Weight resonance-mapping fields.
   | { kind: "resonGrid" };
 
-// Three balanced groups. Core — input/levels + resonance (output) smoothing.
+// Core: input, levels, and resonance smoothing.
 export const CORE_FIELDS: Field[] = [
   { kind: "boolA", key: "formantTrackingEnabled", label: "Continuity Tracking", tip: "Keeps F1/F2/F3 assignment smooth. Best left on." },
   { kind: "boolA", key: "noiseSuppressionEnabled", label: "Noise Suppression", tip: "Toggles background-noise removal." },
@@ -23,7 +23,7 @@ export const CORE_FIELDS: Field[] = [
   { kind: "numP", key: "resonanceSmoothing", label: "Resonance Smoothing", step: 0.05, tip: "Resonance smoothing. Higher is smoother (more lag)." },
 ];
 
-// Pitch — detection + smoothing.
+// Pitch: detection and smoothing.
 export const PITCH_FIELDS: Field[] = [
   { kind: "boolA", key: "pitchVeryAccurate", label: "Very Accurate", tip: "Slower, more precise pitch analysis." },
   { kind: "numA", key: "pitchFloorHz", label: "Pitch Floor", step: 1, tip: "Lowest pitch (Hz) considered." },
@@ -34,7 +34,7 @@ export const PITCH_FIELDS: Field[] = [
   { kind: "numP", key: "pitchSmoothing", label: "Pitch Smoothing", step: 0.05, tip: "Pitch smoothing. Higher is smoother (more lag)." },
 ];
 
-// Formant — extraction + display median + resonance (F2/F3) balance.
+// Formant: extraction, display median, and resonance (F2/F3) balance.
 export const FORMANT_FIELDS: Field[] = [
   { kind: "numA", key: "maxNumberOfFormants", label: "Max Formants", step: 0.5, tip: "How many formant peaks to find." },
   { kind: "numA", key: "maximumFormantHz", label: "Max Formant (Hz)", step: 100, tip: "Upper frequency bound for the search." },

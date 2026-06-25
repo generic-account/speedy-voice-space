@@ -11,7 +11,7 @@ export interface DisplayState {
   resonanceConfidence: number;
   rawF2Hz: number | null;
   rawF3Hz: number | null;
-  // Median-filtered F2/F3 for DISPLAY (strips + readouts) — suppresses intrinsic
+  // Median-filtered F2/F3 for DISPLAY (strips + readouts), suppresses intrinsic
   // per-frame LPC jitter. Resonance is still computed from the raw values.
   filteredF2Hz: number | null;
   filteredF3Hz: number | null;
@@ -136,7 +136,7 @@ export class VoiceProcessor {
     const medianPitch = this.pitchWindow.push(result.pitchHz);
     const medianResonance = this.resonanceWindow.push(score);
 
-    // During unvoiced/silent frames there are no formants — clear the windows so
+    // During unvoiced/silent frames there are no formants, clear the windows so
     // the displayed F2/F3 read null (a gap in the strips), not a stale held line.
     let medianF2: number | null = null;
     let medianF3: number | null = null;

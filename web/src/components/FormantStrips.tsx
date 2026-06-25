@@ -59,7 +59,7 @@ function Strip({ title, samplesRef, clockRef, pick, yMax, color, windowSec }: St
       }
 
       // Right edge = audio anchor + wall-clock elapsed. The anchor (set once in
-      // App) only ever moves forward, so `now` is monotonic by construction — no
+      // App) only ever moves forward, so `now` is monotonic by construction, no
       // backlog burst can drag it. The window is [now - windowSec, now].
       const clk = clockRef.current;
       const now = clk.wall === 0 ? 0 : clk.audioT + (performance.now() - clk.wall) / 1000;

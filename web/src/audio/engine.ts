@@ -1,6 +1,6 @@
 // AudioEngine: audio source → capture AudioWorklet → DSP worker, plus stats.
-// The source is pluggable — getUserMedia for the mic, a decoded WAV for
-// deterministic tests — both feeding the same worklet.
+// The source is pluggable, getUserMedia for the mic, a decoded WAV for
+// deterministic tests, both feeding the same worklet.
 import {
   defaultAnalysisConfig,
   type AnalysisConfig,
@@ -54,10 +54,8 @@ export class AudioEngine {
   // collected per-frame {candidates, committed, coasted} frames from trackDebugLog.
   trackDebugLog: TrackDebugFrame[] = [];
 
-  // Backpressure: capture runs in real time, but the DSP worker may be slower on
-  // weaker devices. Rather than queue every block (unbounded latency + leftward
-  // strip drift), we keep at most one block in flight and accumulate the rest;
-  // when the worker replies we send it the FRESHEST audio, dropping stale blocks.
+  // Backpressure: keep one block in flight; while the worker is busy, accumulate
+  // and send it only the freshest audio on reply (drops stale blocks under load).
   private busy = false;
   private pending: Float32Array[] = [];
   private pendingFrame = 0;
@@ -91,7 +89,7 @@ export class AudioEngine {
     await this.stop();
     const ctx = await this.createContext();
 
-    // Resume *before* getUserMedia, while the click's gesture is still active —
+    // Resume *before* getUserMedia, while the click's gesture is still active,
     // after the permission dialog the gesture has expired and resume() no-ops,
     // leaving the context suspended (no audio). The listener below is a backup.
     try {

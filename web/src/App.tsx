@@ -51,7 +51,7 @@ function aboutTabStyle(active: boolean): React.CSSProperties {
   };
 }
 
-// About content as switchable pages — append an entry to add a tab.
+// About content as switchable pages, append an entry to add a tab.
 const ABOUT_PAGES: { label: string; body: React.ReactNode }[] = [
   {
     label: "About",
@@ -202,7 +202,7 @@ function saveSettings(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* storage unavailable (private mode) — ignore */
+    /* storage unavailable (private mode), ignore */
   }
 }
 
@@ -257,7 +257,7 @@ export default function App() {
   const [display, setDisplay] = useState<DisplayState | null>(null);
 
   // When the window is too horizontally short (portrait-ish or just narrow), the
-  // height-sized square plot crowds out the sidebar — stack everything instead.
+  // height-sized square plot crowds out the sidebar, stack everything instead.
   const narrow = useMediaQuery("(max-aspect-ratio: 7/5), (max-width: 760px)");
 
   const [aboutPage, setAboutPage] = useState(0); // selected About tab
@@ -286,12 +286,9 @@ export default function App() {
         f2: state.filteredF2Hz ?? NaN,
         f3: state.filteredF3Hz ?? NaN,
       });
-      // Phase-lock the strip's right edge to the audio capture clock. The edge
-      // runs on performance.now(), but samples are timestamped by the audio device
-      // clock (worklet currentFrame); those oscillators drift (visible on Safari).
-      // So correct both ways, capped: catch up FAST when real capture runs ahead
-      // (a drained backlog), and ease back SLOWLY when the edge has drifted past
-      // the newest sample. The small caps keep it smooth — no snap, no creep.
+      // Phase-lock the wall-clock edge to the audio capture clock (they drift):
+      // catch up fast when capture runs ahead, ease back slowly when it falls
+      // behind. Capped both ways so it stays smooth.
       const wallNow = performance.now();
       const c = clockRef.current;
       if (c.wall === 0) {
@@ -416,7 +413,7 @@ export default function App() {
         overflowY: narrow ? "auto" : "hidden",
       }}
     >
-      {/* Square scatter plot — sized to height when side-by-side, to width when stacked */}
+      {/* Square scatter plot, sized to height when side-by-side, to width when stacked */}
       <div
         style={{
           flex: "none",
@@ -439,7 +436,7 @@ export default function App() {
         />
       </div>
 
-      {/* Right: strips, readouts, controls — beside the plot, or below it when stacked */}
+      {/* Right: strips, readouts, controls, beside the plot, or below it when stacked */}
       <div
         style={{
           flex: narrow ? "none" : "1 1 0",
@@ -453,7 +450,7 @@ export default function App() {
           gap: 8,
         }}
       >
-        {/* Controls + live status (rms lives here — it's a settings/levels cue) */}
+        {/* Controls + live status (rms lives here, it's a settings/levels cue) */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {!running ? (
             <button data-testid="start" onClick={start}>Start</button>
