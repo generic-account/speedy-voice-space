@@ -28,10 +28,10 @@ export function MainPlot({ trail, xRange, yRange }: Props) {
     x: xRange,
     y: yRange,
   });
-  const [transposed, setTransposed] = useState(false);
+  const [transposed, setTransposed] = useState(true);
   const [resizeTick, setResizeTick] = useState(0);
 
-  // Re-home when the configured range VALUES change (not on every render — the
+  // Re-home when the configured range VALUES change (not on every render, the
   // parent passes fresh array literals, so depend on the numbers themselves).
   useEffect(() => {
     setView({ x: [xRange[0], xRange[1]], y: [yRange[0], yRange[1]] });
