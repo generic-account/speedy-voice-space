@@ -24,17 +24,19 @@ const fmtRes = (v: number) => v.toFixed(2);
 // button transposes (swaps which variable is on which axis).
 export function MainPlot({ trail, xRange, yRange }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [view, setView] = useState<{ x: [number, number]; y: [number, number] }>({
-    x: xRange,
-    y: yRange,
-  });
   const [transposed, setTransposed] = useState(true);
+  // Home view ranges, following the current orientation (x is whichever variable
+  // is on the x-axis). Used for the initial view, re-home, and double-click reset.
+  const homeView = (t: boolean): { x: [number, number]; y: [number, number] } =>
+    t
+      ? { x: [yRange[0], yRange[1]], y: [xRange[0], xRange[1]] }
+      : { x: [xRange[0], xRange[1]], y: [yRange[0], yRange[1]] };
+  const [view, setView] = useState(() => homeView(transposed));
   const [resizeTick, setResizeTick] = useState(0);
 
-  // Re-home when the configured range VALUES change (not on every render, the
-  // parent passes fresh array literals, so depend on the numbers themselves).
+  // Re-home when the configured range VALUES change.
   useEffect(() => {
-    setView({ x: [xRange[0], xRange[1]], y: [yRange[0], yRange[1]] });
+    setView(homeView(transposed));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [xRange[0], xRange[1], yRange[0], yRange[1]]);
 
@@ -189,9 +191,7 @@ export function MainPlot({ trail, xRange, yRange }: Props) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onDoubleClick={() =>
-          setView({ x: transposed ? yRange : xRange, y: transposed ? xRange : yRange })
-        }
+        onDoubleClick={() => setView(homeView(transposed))}
         title="scroll to zoom · drag to pan · double-click to reset"
         style={{ width: "100%", height: "100%", display: "block", cursor: "crosshair" }}
       />
