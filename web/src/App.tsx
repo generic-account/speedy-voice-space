@@ -27,16 +27,161 @@ const ABOUT_CARD: React.CSSProperties = {
   color: C.label,
   lineHeight: 1.5,
 };
-const ABOUT_HEAD: React.CSSProperties = {
-  fontWeight: 700,
-  fontSize: 14,
-  color: C.text,
-  margin: "12px 0 4px",
-  breakAfter: "avoid",
-  breakInside: "avoid",
+const ABOUT_P: React.CSSProperties = { margin: "0 0 8px" };
+const ABOUT_LEAD: React.CSSProperties = { margin: "0 0 2px" };
+const ABOUT_UL: React.CSSProperties = { margin: "0 0 8px", paddingLeft: 18 };
+const ABOUT_TABS: React.CSSProperties = {
+  display: "flex",
+  gap: 16,
+  marginBottom: 8,
+  borderBottom: `1px solid ${C.border}`,
 };
-const ABOUT_HEAD_TOP: React.CSSProperties = { ...ABOUT_HEAD, marginTop: 0 };
-const ABOUT_P: React.CSSProperties = { margin: "0 0 8px", breakInside: "avoid" };
+function aboutTabStyle(active: boolean): React.CSSProperties {
+  return {
+    background: "transparent",
+    border: "none",
+    borderRadius: 0,
+    padding: "0 0 5px",
+    marginBottom: -1, // sit the underline on the row's border
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 700,
+    color: active ? C.text : C.muted,
+    borderBottom: `2px solid ${active ? C.accent : "transparent"}`,
+  };
+}
+
+// About content as switchable pages — append an entry to add a tab.
+const ABOUT_PAGES: { label: string; body: React.ReactNode }[] = [
+  {
+    label: "About",
+    body: (
+      <>
+        <p style={ABOUT_P}>
+          This site provides live pitch and resonance tracking, based on Praat
+          algorithms ported to Rust and compiled to wasm. It is hosted statically
+          on GitHub Pages and runs entirely in your browser. Your data never
+          leaves your device.
+        </p>
+        <p style={ABOUT_P}>
+          The site <em>should</em> work in every modern desktop and mobile
+          browser. If you notice any problems or would like to see any new
+          features, please open a GitHub issue{" "}
+          <a
+            href="https://github.com/generic-account/speedy-voice-space/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: C.accent }}
+          >
+            here
+          </a>
+          .
+        </p>
+        <p style={ABOUT_P}>
+          Our voices are composed of a distribution of frequencies, with pitch
+          being the base. Resonance is generally the process by which the higher
+          frequencies of the voice’s audio spectrum are transformed by the shape
+          of our vocal tract.
+        </p>
+        <p style={ABOUT_P}>
+          By making your vocal tract smaller (e.g. by pushing your tongue to the
+          front of your mouth), you can raise the resonance of your voice, and by
+          moving your tongue further down and back to enlarge the vocal tract you
+          can lower the resonance of your voice.
+        </p>
+        <p style={ABOUT_P}>
+          Formants represent “peaks” in the frequency spectrum of voice, with F0
+          representing pitch, F1 being associated with vowel height, F2 associated
+          with vowel advancement, and F3 associated with vocal tract length. The
+          weighted average of normalized F2 and F3 values provides a pretty good
+          heuristic for our perception of resonance, which is what preexisting
+          projects, literature, and I use.
+        </p>
+        <p style={{ ...ABOUT_P, marginBottom: 0 }}>
+          Thank you so much to{" "}
+          <a
+            href="https://acousticgender.space/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: C.accent }}
+          >
+            Acoustic Genderspace
+          </a>{" "}
+          for the inspiration! It’s an amazing site and I wanted something real time
+          to shorten the voice training feedback loop. I hope it helps!
+        </p>
+      </>
+    ),
+  },
+  {
+    label: "How to use",
+    body: (
+      <>
+        <p style={ABOUT_P}>
+          Press “Start” and give the site access to your microphone, selecting the
+          input you intend to use. Observe your baseline level of background noise
+          (RMS), and the RMS measurement when you are speaking, and set the RMS
+          threshold in “Core Settings” in between.
+        </p>
+        <p style={ABOUT_P}>
+          Hold out a vowel sound, and watch your pitch and resonance on the 2D
+          graph, or your raw extracted F2 and F3 values on the time-series charts
+          above.
+        </p>
+        <p style={ABOUT_P}>
+          If your environment has a lot of background noise, turning on noise
+          suppression and tuning the suppression strength could improve results.
+          Active noise suppression is heavier computationally and can slightly
+          affect output quality, so it is not on by default.
+        </p>
+        <p style={ABOUT_P}>
+          If the output data remains noisy or spiky (which can be the case
+          depending on voice / what is being spoken), adjust the median or smoothing
+          parameters for resonance or pitch, corresponding to the noisy output
+          parameter you observe. A larger median outright rejects outlier input
+          data points, while exponential smoothing blends each median-filtered data
+          point into a moving average. A larger median more aggressively eliminates
+          outliers, and a larger smoothing value leans more on historical points for
+          a smoother line. Raising either parameter leads to slightly laggier output.
+        </p>
+        <p style={{ ...ABOUT_P, marginBottom: 0 }}>Hover over any setting for more information.</p>
+      </>
+    ),
+  },
+  {
+    label: "Shaping",
+    body: (
+      <>
+        <p style={ABOUT_P}>
+          <b>Darker resonance:</b> higher F1, lower F2, lower F3.
+          <br />
+          <b>Brighter resonance:</b> lower F1, higher F2, higher F3.
+        </p>
+        <p style={ABOUT_LEAD}>
+          <b>F1</b> (tongue up vs. down):
+        </p>
+        <ul style={ABOUT_UL}>
+          <li>High F1: low vowel, low tongue body.</li>
+          <li>Low F1: high vowel, high tongue body.</li>
+        </ul>
+        <p style={ABOUT_LEAD}>
+          <b>F2</b> (tongue forward vs. back):
+        </p>
+        <ul style={ABOUT_UL}>
+          <li>High F2: front vowel, tongue forward.</li>
+          <li>Low F2: back vowel, tongue back / retracted.</li>
+        </ul>
+        <p style={ABOUT_LEAD}>
+          <b>F3</b> (partly lip rounding vs. spreading):
+        </p>
+        <ul style={{ ...ABOUT_UL, marginBottom: 0 }}>
+          <li>High F3: spread lips.</li>
+          <li>Low F3: rounded and/or protruded lips.</li>
+        </ul>
+      </>
+    ),
+  },
+];
 // Plot "home" range (double-click reset / initial view). Wide enough for any
 // voice; users scroll/drag to zoom into their own range.
 const PLOT_PITCH_RANGE: [number, number] = [65, 500];
@@ -114,6 +259,8 @@ export default function App() {
   // When the window is too horizontally short (portrait-ish or just narrow), the
   // height-sized square plot crowds out the sidebar — stack everything instead.
   const narrow = useMediaQuery("(max-aspect-ratio: 7/5), (max-width: 760px)");
+
+  const [aboutPage, setAboutPage] = useState(0); // selected About tab
 
   // Plot histories (mutable refs; React re-renders pull snapshots each frame).
   const trailRef = useRef<TrailPoint[]>([]);
@@ -396,73 +543,22 @@ export default function App() {
           </pre>
         )}
 
-        <div
-          style={{
-            ...ABOUT_CARD,
-            columnCount: narrow ? 1 : 2,
-            columnGap: 20,
-          }}
-        >
-          <h3 style={ABOUT_HEAD_TOP}>About</h3>
-          <p style={ABOUT_P}>
-            This site provides live pitch and resonance tracking, based on Praat
-            algorithms ported to Rust and compiled to wasm.
-          </p>
-          <p style={ABOUT_P}>
-            Our voices are composed of a distribution of frequencies, with pitch
-            being the base. Resonance is generally the process by which the higher
-            frequencies of the voice’s audio spectrum are transformed by the shape
-            of our vocal tract.
-          </p>
-          <p style={ABOUT_P}>
-            By making your vocal tract smaller (e.g. by pushing your tongue to the
-            front of your mouth), you can raise the resonance of your voice, and by
-            moving your tongue further down and back to enlarge the vocal tract you
-            can lower the resonance of your voice.
-          </p>
-          <p style={ABOUT_P}>
-            Formants represent “peaks” in the frequency spectrum of voice, with F0
-            representing pitch, F1 being associated with vowel height, F2
-            associated with vowel advancement, and F3 associated with vocal tract
-            length. The weighted average of normalized F2 and F3 values provides a
-            pretty good heuristic for our perception of resonance, which is what
-            preexisting projects, literature, and I use.
-          </p>
-
-          <h3 style={ABOUT_HEAD}>How to use</h3>
-          <p style={ABOUT_P}>
-            Press “Start” and give the site access to your microphone, selecting
-            the input you intend to use. Observe your baseline level of background
-            noise (RMS), and the RMS measurement when you are speaking, and set the
-            RMS threshold in “Core Settings” in between.
-          </p>
-          <p style={ABOUT_P}>
-            Hold out a vowel sound, and watch your pitch and resonance on the 2D
-            graph, or your raw extracted F2 and F3 values on the time-series charts
-            above.
-          </p>
-          <p style={ABOUT_P}>
-            If your environment is quite noisy, increasing the suppression strength
-            could improve results. If the output data remains noisy (which can be
-            the case depending on voice / what is being spoken), adjust the median
-            or smoothing parameters for resonance or pitch.
-          </p>
-          <p style={ABOUT_P}>Hover over any setting for more information.</p>
-
-          <h3 style={ABOUT_HEAD}>Thanks</h3>
-          <p style={{ ...ABOUT_P, marginBottom: 0 }}>
-            Thank you so much to{" "}
-            <a
-              href="https://acousticgender.space/"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: C.accent }}
-            >
-              Acoustic Genderspace
-            </a>{" "}
-            for the inspiration! It’s an amazing site and I wanted something real
-            time to shorten the voice training feedback loop. I hope it helps!
-          </p>
+        <div style={ABOUT_CARD}>
+          {ABOUT_PAGES.length > 1 && (
+            <div style={ABOUT_TABS}>
+              {ABOUT_PAGES.map((p, i) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => setAboutPage(i)}
+                  style={aboutTabStyle(i === aboutPage)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {ABOUT_PAGES[aboutPage].body}
         </div>
       </div>
     </div>
