@@ -25,8 +25,9 @@ export interface ProcessingSettings {
   resonanceMedianWindow: number;
   // Causal median on the DISPLAYED formants only (display, not the score).
   formantMedianWindow: number;
-  pitchAlpha: number;
-  resonanceAlpha: number;
+  // EMA smoothing amount in [0,1): higher = smoother + laggier (alpha = 1 - this).
+  pitchSmoothing: number;
+  resonanceSmoothing: number;
   f2LowHz: number;
   f2HighHz: number;
   f3LowHz: number;
@@ -67,8 +68,8 @@ export function defaultProcessingSettings(): ProcessingSettings {
     pitchMedianWindow: 5,
     resonanceMedianWindow: 7,
     formantMedianWindow: 3,
-    pitchAlpha: 0.25,
-    resonanceAlpha: 0.15,
+    pitchSmoothing: 0.75,
+    resonanceSmoothing: 0.85,
     f2LowHz: 600,
     f2HighHz: 3000,
     f3LowHz: 1500,

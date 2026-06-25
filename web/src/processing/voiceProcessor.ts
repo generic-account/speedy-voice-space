@@ -148,15 +148,17 @@ export class VoiceProcessor {
       this.f3Window.clear();
     }
 
+    // Smoothing is the user-facing amount (higher = smoother); the EMA weight on
+    // the new sample is its complement.
     this.smoothedPitch = smoothValue(
       this.smoothedPitch,
       medianPitch,
-      this.settings.pitchAlpha,
+      1 - this.settings.pitchSmoothing,
     );
     this.smoothedResonance = smoothValue(
       this.smoothedResonance,
       medianResonance,
-      this.settings.resonanceAlpha,
+      1 - this.settings.resonanceSmoothing,
     );
 
     return {

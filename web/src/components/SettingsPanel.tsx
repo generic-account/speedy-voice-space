@@ -20,7 +20,7 @@ export const CORE_FIELDS: Field[] = [
   { kind: "numA", key: "rmsThreshold", label: "RMS Threshold", step: 0.0001, tip: "Loudness gate. Set between background and speaking levels." },
   { kind: "numA", key: "bufferDurationS", label: "Buffer (s)", step: 0.005, tip: "Audio window length per frame." },
   { kind: "numP", key: "resonanceMedianWindow", label: "Resonance Median", step: 1, tip: "Median filter on resonance. Rejects spikes." },
-  { kind: "numP", key: "resonanceAlpha", label: "Resonance Smoothing", step: 0.05, tip: "Resonance smoothing. Higher is snappier." },
+  { kind: "numP", key: "resonanceSmoothing", label: "Resonance Smoothing", step: 0.05, tip: "Resonance smoothing. Higher is smoother (more lag)." },
 ];
 
 // Pitch — detection + smoothing.
@@ -31,7 +31,7 @@ export const PITCH_FIELDS: Field[] = [
   { kind: "numA", key: "pitchSilenceThreshold", label: "Silence Threshold", step: 0.01, tip: "Below this, frames count as unvoiced." },
   { kind: "numA", key: "pitchVoicingThreshold", label: "Voicing Threshold", step: 0.01, tip: "Strength needed to call a frame voiced. Higher is stricter." },
   { kind: "numP", key: "pitchMedianWindow", label: "Pitch Median", step: 1, tip: "Median filter on pitch." },
-  { kind: "numP", key: "pitchAlpha", label: "Pitch Smoothing", step: 0.05, tip: "Pitch smoothing. Higher is snappier." },
+  { kind: "numP", key: "pitchSmoothing", label: "Pitch Smoothing", step: 0.05, tip: "Pitch smoothing. Higher is smoother (more lag)." },
 ];
 
 // Formant — extraction + display median + resonance (F2/F3) balance.
@@ -69,7 +69,9 @@ const rowStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = { color: C.label, whiteSpace: "nowrap" };
-const numInputStyle: React.CSSProperties = { width: 60, fontSize: 11 };
+// width is the resting size; minWidth:0 lets it shrink instead of overflowing
+// when the panel column gets narrow.
+const numInputStyle: React.CSSProperties = { width: 60, minWidth: 0, fontSize: 11 };
 const gridInputStyle: React.CSSProperties = { flex: 1, minWidth: 0, width: 0, fontSize: 11 };
 
 interface TipState {
