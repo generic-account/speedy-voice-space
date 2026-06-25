@@ -68,6 +68,10 @@ class MedianWindow {
   }
 }
 
+// Hold the displayed pitch/resonance/formants across this many consecutive
+// unvoiced frames before gapping, so brief dropouts mid-vowel don't flicker.
+const BRIDGE_FRAMES = 2;
+
 export class VoiceProcessor {
   private pitchWindow: MedianWindow;
   private resonanceWindow: MedianWindow;
@@ -75,6 +79,9 @@ export class VoiceProcessor {
   private f3Window: MedianWindow;
   private smoothedPitch: number | null = null;
   private smoothedResonance: number | null = null;
+  private dispF2: number | null = null;
+  private dispF3: number | null = null;
+  private unvoicedRun = 0;
 
   constructor(private settings: ProcessingSettings) {
     this.pitchWindow = new MedianWindow(settings.pitchMedianWindow);
@@ -89,17 +96,23 @@ export class VoiceProcessor {
     this.resonanceWindow.setMaxlen(settings.resonanceMedianWindow);
     this.f2Window.setMaxlen(settings.formantMedianWindow);
     this.f3Window.setMaxlen(settings.formantMedianWindow);
-    this.smoothedPitch = null;
-    this.smoothedResonance = null;
+    this.clearDisplay();
   }
 
   reset() {
+    this.clearDisplay();
+  }
+
+  private clearDisplay() {
     this.pitchWindow.clear();
     this.resonanceWindow.clear();
     this.f2Window.clear();
     this.f3Window.clear();
     this.smoothedPitch = null;
     this.smoothedResonance = null;
+    this.dispF2 = null;
+    this.dispF3 = null;
+    this.unvoicedRun = 0;
   }
 
   private computeResonance(formants: number[]): {
@@ -133,33 +146,23 @@ export class VoiceProcessor {
   process(result: AnalysisResult): DisplayState {
     const { score, confidence, f2, f3 } = this.computeResonance(result.formantsHz);
 
-    const medianPitch = this.pitchWindow.push(result.pitchHz);
-    const medianResonance = this.resonanceWindow.push(score);
-
-    // During unvoiced/silent frames there are no formants, clear the windows so
-    // the displayed F2/F3 read null (a gap in the strips), not a stale held line.
-    let medianF2: number | null = null;
-    let medianF3: number | null = null;
     if (result.voiced) {
-      medianF2 = this.f2Window.push(f2);
-      medianF3 = this.f3Window.push(f3);
-    } else {
-      this.f2Window.clear();
-      this.f3Window.clear();
+      // Voiced: advance all displayed values together.
+      this.unvoicedRun = 0;
+      const medianPitch = this.pitchWindow.push(result.pitchHz);
+      const medianResonance = this.resonanceWindow.push(score);
+      this.dispF2 = this.f2Window.push(f2);
+      this.dispF3 = this.f3Window.push(f3);
+      // Smoothing is the user-facing amount (higher = smoother); the EMA weight
+      // on the new sample is its complement.
+      this.smoothedPitch = smoothValue(this.smoothedPitch, medianPitch, 1 - this.settings.pitchSmoothing);
+      this.smoothedResonance = smoothValue(this.smoothedResonance, medianResonance, 1 - this.settings.resonanceSmoothing);
+    } else if (++this.unvoicedRun > BRIDGE_FRAMES) {
+      // Sustained unvoiced/silence: gap everything (and reset so the next
+      // utterance starts fresh rather than blending from a stale value).
+      this.clearDisplay();
     }
-
-    // Smoothing is the user-facing amount (higher = smoother); the EMA weight on
-    // the new sample is its complement.
-    this.smoothedPitch = smoothValue(
-      this.smoothedPitch,
-      medianPitch,
-      1 - this.settings.pitchSmoothing,
-    );
-    this.smoothedResonance = smoothValue(
-      this.smoothedResonance,
-      medianResonance,
-      1 - this.settings.resonanceSmoothing,
-    );
+    // else: a brief dropout within the bridge — hold the last displayed values.
 
     return {
       voiced: result.voiced,
@@ -169,8 +172,8 @@ export class VoiceProcessor {
       resonanceConfidence: confidence,
       rawF2Hz: f2,
       rawF3Hz: f3,
-      filteredF2Hz: medianF2,
-      filteredF3Hz: medianF3,
+      filteredF2Hz: this.dispF2,
+      filteredF3Hz: this.dispF3,
       formantsHz: [...result.formantsHz],
     };
   }
