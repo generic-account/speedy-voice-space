@@ -29,6 +29,7 @@ function applyConfig(cfg: AnalysisConfig) {
   pitch?.setRange(cfg.pitchFloorHz, cfg.pitchCeilingHz);
   pitch?.setThresholds(cfg.pitchSilenceThreshold, cfg.pitchVoicingThreshold);
   pitch?.setVeryAccurate(cfg.pitchVeryAccurate);
+  pitch?.resetTracking();
   formant?.setMaxNumberOfFormants(cfg.maxNumberOfFormants);
   formant?.setMaximumFormant(cfg.maximumFormantHz);
   formant?.setWindowLength(cfg.windowLengthS);
@@ -101,9 +102,10 @@ function analyze(): AnalysisResult | null {
   const t = captureFrame / config.samplerate;
 
   if (r < config.rmsThreshold) {
-    // Stay silent for the strips, but DON'T reset the tracker or lastFormants:
-    // we want F3 (which can be a wide/jumpy pole at a vowel's onset) to coast
-    // from the last good value across the gap rather than vanish or wobble.
+    // Stay silent for the strips, but DON'T reset the formant tracker/lastFormants:
+    // F3 (a wide/jumpy pole at a vowel's onset) should coast across the gap. Do
+    // drop pitch history so a new utterance isn't biased toward the old f0.
+    pitch.resetTracking();
     return { voiced: false, pitchHz: null, formantsHz: [], t };
   }
 

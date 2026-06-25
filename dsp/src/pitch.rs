@@ -16,6 +16,10 @@ pub struct PitchParams {
     pub voicing_threshold: f64,
     /// Praat default 0.01 (favours higher f0 to suppress sub-harmonics).
     pub octave_cost: f64,
+    /// Cross-frame cost of an octave jump from the previous f0 (Praat 0.35).
+    pub octave_jump_cost: f64,
+    /// Cross-frame cost of switching voiced<->unvoiced (Praat 0.14).
+    pub voiced_unvoiced_cost: f64,
     pub very_accurate: bool,
 }
 
@@ -28,6 +32,8 @@ impl Default for PitchParams {
             silence_threshold: 0.03,
             voicing_threshold: 0.45,
             octave_cost: 0.01,
+            octave_jump_cost: 0.35,
+            voiced_unvoiced_cost: 0.14,
             very_accurate: false,
         }
     }
@@ -84,20 +90,20 @@ fn parabolic_peak(y: &[f64], i: usize) -> (f64, f64) {
     (offset, peak)
 }
 
-pub fn analyze_pitch(frame: &[f64], p: &PitchParams) -> PitchResult {
+/// Per-frame voiced candidates [(freq, strength)] plus the unvoiced strength.
+/// `None` only for degenerate frames (too short / silent) -> always unvoiced.
+fn pitch_candidates(frame: &[f64], p: &PitchParams) -> Option<(Vec<(f64, f64)>, f64)> {
     let sr = p.samplerate;
     let n_total = frame.len();
     if n_total < 16 {
-        return PitchResult { voiced: false, f0: None, strength: 0.0 };
+        return None;
     }
 
     // Silence reference: global peak of the mean-subtracted sound.
     let global_mean = frame.iter().sum::<f64>() / n_total as f64;
-    let global_peak = frame
-        .iter()
-        .fold(0.0_f64, |m, &v| m.max((v - global_mean).abs()));
+    let global_peak = frame.iter().fold(0.0_f64, |m, &v| m.max((v - global_mean).abs()));
     if global_peak <= 0.0 {
-        return PitchResult { voiced: false, f0: None, strength: 0.0 };
+        return None;
     }
 
     // Window spans periodsPerWindow / floor (3 periods, or 6 if very accurate).
@@ -107,7 +113,7 @@ pub fn analyze_pitch(frame: &[f64], p: &PitchParams) -> PitchResult {
         nwin = n_total;
     }
     if nwin < 16 {
-        return PitchResult { voiced: false, f0: None, strength: 0.0 };
+        return None;
     }
     let start = (n_total - nwin) / 2; // centered window (the midpoint frame)
     let seg = &frame[start..start + nwin];
@@ -121,6 +127,7 @@ pub fn analyze_pitch(frame: &[f64], p: &PitchParams) -> PitchResult {
         centered[i] = v;
         local_peak = local_peak.max(v.abs());
     }
+    let uv = unvoiced_strength(p, local_peak, global_peak);
 
     let w = hanning(nwin);
     let windowed: Vec<f64> = centered.iter().zip(&w).map(|(a, b)| a * b).collect();
@@ -128,28 +135,23 @@ pub fn analyze_pitch(frame: &[f64], p: &PitchParams) -> PitchResult {
     let min_lag = (sr / p.ceiling).floor() as usize;
     let max_lag = ((sr / p.floor).ceil() as usize).min(nwin - 2);
     if max_lag <= min_lag || min_lag < 1 {
-        return unvoiced(p, local_peak, global_peak);
+        return Some((Vec::new(), uv));
     }
 
     // Window-normalized autocorrelation (Boersma): r = (acx/acx0) / (acw/acw0).
     let acx = autocorr(&windowed, max_lag);
     let acw = autocorr(&w, max_lag);
     if acx[0] <= 0.0 || acw[0] <= 0.0 {
-        return unvoiced(p, local_peak, global_peak);
+        return Some((Vec::new(), uv));
     }
     let mut r = vec![0.0; max_lag + 1];
     for lag in 0..=max_lag {
         let rw = acw[lag] / acw[0];
-        r[lag] = if rw.abs() > 1e-9 {
-            (acx[lag] / acx[0]) / rw
-        } else {
-            0.0
-        };
+        r[lag] = if rw.abs() > 1e-9 { (acx[lag] / acx[0]) / rw } else { 0.0 };
     }
 
-    // Best voiced candidate among local maxima in [min_lag, max_lag].
-    let mut best_f = 0.0;
-    let mut best_strength = -1e9;
+    // All voiced candidates: local maxima in [min_lag, max_lag].
+    let mut cands = Vec::new();
     for lag in min_lag..max_lag {
         if r[lag] > r[lag - 1] && r[lag] >= r[lag + 1] {
             let (offset, peak) = parabolic_peak(&r, lag);
@@ -162,20 +164,94 @@ pub fn analyze_pitch(frame: &[f64], p: &PitchParams) -> PitchResult {
                 continue;
             }
             // Octave cost favours the true f0 over its subharmonics.
-            let strength = peak - p.octave_cost * (p.ceiling / f).log2();
-            if strength > best_strength {
-                best_strength = strength;
-                best_f = f;
-            }
+            cands.push((f, peak - p.octave_cost * (p.ceiling / f).log2()));
         }
     }
+    Some((cands, uv))
+}
 
-    let unvoiced_strength = unvoiced_strength(p, local_peak, global_peak);
-
-    if best_strength > unvoiced_strength && best_f > 0.0 {
+/// Stateless per-frame pitch: the strongest candidate (no cross-frame memory).
+pub fn analyze_pitch(frame: &[f64], p: &PitchParams) -> PitchResult {
+    let Some((cands, uv)) = pitch_candidates(frame, p) else {
+        return PitchResult { voiced: false, f0: None, strength: 0.0 };
+    };
+    let mut best_f = 0.0;
+    let mut best_strength = -1e9;
+    for &(f, s) in &cands {
+        if s > best_strength {
+            best_strength = s;
+            best_f = f;
+        }
+    }
+    if best_strength > uv && best_f > 0.0 {
         PitchResult { voiced: true, f0: Some(best_f), strength: best_strength }
     } else {
-        PitchResult { voiced: false, f0: None, strength: unvoiced_strength }
+        PitchResult { voiced: false, f0: None, strength: uv }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Prev {
+    None,
+    Unvoiced,
+    Voiced(f64),
+}
+
+/// Online pitch tracker: a causal one-step version of Praat's path finder. Each
+/// frame it picks the candidate minimizing (-strength + transition cost from the
+/// previous committed frame), where the transition penalizes octave jumps and
+/// voiced<->unvoiced flips. This is what kills the per-frame octave wobble.
+pub struct PitchTracker {
+    pub params: PitchParams,
+    prev: Prev,
+}
+
+impl PitchTracker {
+    pub fn new(params: PitchParams) -> Self {
+        PitchTracker { params, prev: Prev::None }
+    }
+
+    pub fn reset(&mut self) {
+        self.prev = Prev::None;
+    }
+
+    pub fn analyze(&mut self, frame: &[f64]) -> PitchResult {
+        let res = match pitch_candidates(frame, &self.params) {
+            None => PitchResult { voiced: false, f0: None, strength: 0.0 },
+            Some((cands, uv)) => select_tracked(&cands, uv, self.prev, &self.params),
+        };
+        self.prev = match res.f0 {
+            Some(f) => Prev::Voiced(f),
+            None => Prev::Unvoiced,
+        };
+        res
+    }
+}
+
+fn transition_cost(prev: Prev, cand: Option<f64>, p: &PitchParams) -> f64 {
+    match (prev, cand) {
+        (Prev::None, _) => 0.0,
+        (Prev::Voiced(pf), Some(f)) => p.octave_jump_cost * (f / pf).log2().abs(),
+        (Prev::Voiced(_), None) => p.voiced_unvoiced_cost,
+        (Prev::Unvoiced, Some(_)) => p.voiced_unvoiced_cost,
+        (Prev::Unvoiced, None) => 0.0,
+    }
+}
+
+fn select_tracked(cands: &[(f64, f64)], uv: f64, prev: Prev, p: &PitchParams) -> PitchResult {
+    // Cost is -strength + transition; lower is better. Seed with the unvoiced option.
+    let mut best_cost = -uv + transition_cost(prev, None, p);
+    let mut best: Option<(f64, f64)> = None;
+    for &(f, s) in cands {
+        let cost = -s + transition_cost(prev, Some(f), p);
+        if cost < best_cost {
+            best_cost = cost;
+            best = Some((f, s));
+        }
+    }
+    match best {
+        Some((f, s)) => PitchResult { voiced: true, f0: Some(f), strength: s },
+        None => PitchResult { voiced: false, f0: None, strength: uv },
     }
 }
 
@@ -185,13 +261,6 @@ fn unvoiced_strength(p: &PitchParams, local_peak: f64, global_peak: f64) -> f64 
     p.voicing_threshold + (2.0 - ratio / denom).max(0.0)
 }
 
-fn unvoiced(p: &PitchParams, local_peak: f64, global_peak: f64) -> PitchResult {
-    PitchResult {
-        voiced: false,
-        f0: None,
-        strength: unvoiced_strength(p, local_peak, global_peak),
-    }
-}
 
 #[cfg(test)]
 mod tests {

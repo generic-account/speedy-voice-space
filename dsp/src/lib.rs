@@ -14,7 +14,7 @@ use wasm_bindgen::prelude::*;
 /// `Float32Array` window; `analyze` returns f0 (Hz) or NaN when unvoiced.
 #[wasm_bindgen]
 pub struct PitchAnalyzer {
-    params: pitch::PitchParams,
+    tracker: pitch::PitchTracker,
 }
 
 #[wasm_bindgen]
@@ -22,32 +22,38 @@ impl PitchAnalyzer {
     #[wasm_bindgen(constructor)]
     pub fn new(samplerate: f64) -> PitchAnalyzer {
         PitchAnalyzer {
-            params: pitch::PitchParams { samplerate, ..Default::default() },
+            tracker: pitch::PitchTracker::new(pitch::PitchParams { samplerate, ..Default::default() }),
         }
     }
 
     #[wasm_bindgen(js_name = setRange)]
     pub fn set_range(&mut self, floor: f64, ceiling: f64) {
-        self.params.floor = floor;
-        self.params.ceiling = ceiling;
+        self.tracker.params.floor = floor;
+        self.tracker.params.ceiling = ceiling;
     }
 
     #[wasm_bindgen(js_name = setThresholds)]
     pub fn set_thresholds(&mut self, silence: f64, voicing: f64) {
-        self.params.silence_threshold = silence;
-        self.params.voicing_threshold = voicing;
+        self.tracker.params.silence_threshold = silence;
+        self.tracker.params.voicing_threshold = voicing;
     }
 
     #[wasm_bindgen(js_name = setVeryAccurate)]
     pub fn set_very_accurate(&mut self, very_accurate: bool) {
-        self.params.very_accurate = very_accurate;
+        self.tracker.params.very_accurate = very_accurate;
+    }
+
+    /// Drop cross-frame pitch history (call on a voicing gap or config change).
+    #[wasm_bindgen(js_name = resetTracking)]
+    pub fn reset_tracking(&mut self) {
+        self.tracker.reset();
     }
 
     /// Returns f0 in Hz, or NaN if the window is unvoiced.
     #[wasm_bindgen]
-    pub fn analyze(&self, frame: &[f32]) -> f64 {
+    pub fn analyze(&mut self, frame: &[f32]) -> f64 {
         let buf: Vec<f64> = frame.iter().map(|&v| v as f64).collect();
-        match pitch::analyze_pitch(&buf, &self.params).f0 {
+        match self.tracker.analyze(&buf).f0 {
             Some(f) => f,
             None => f64::NAN,
         }
