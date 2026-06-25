@@ -286,18 +286,20 @@ export default function App() {
         f2: state.filteredF2Hz ?? NaN,
         f3: state.filteredF3Hz ?? NaN,
       });
-      // Anchor the audio→wall mapping so the strips scroll on the wall clock. We
-      // keep the tightest (lowest-latency) anchor we've seen: nudge forward only
-      // when real capture outpaces the edge (cold-start/drift), capped so a
-      // drained backlog — whose timestamps never exceed real capture — can't snap
-      // it. The edge thus advances at real time, immune to bursty result arrival.
+      // Phase-lock the strip's right edge to the audio capture clock. The edge
+      // runs on performance.now(), but samples are timestamped by the audio device
+      // clock (worklet currentFrame); those oscillators drift (visible on Safari).
+      // So correct both ways, capped: catch up FAST when real capture runs ahead
+      // (a drained backlog), and ease back SLOWLY when the edge has drifted past
+      // the newest sample. The small caps keep it smooth — no snap, no creep.
       const wallNow = performance.now();
       const c = clockRef.current;
       if (c.wall === 0) {
         clockRef.current = { audioT: result.t, wall: wallNow };
       } else {
         const ahead = result.t - (c.audioT + (wallNow - c.wall) / 1000);
-        if (ahead > 0) clockRef.current = { audioT: c.audioT + Math.min(ahead, 0.05), wall: c.wall };
+        const nudge = ahead > 0 ? Math.min(ahead, 0.05) : Math.max(ahead, -0.003);
+        clockRef.current = { audioT: c.audioT + nudge, wall: c.wall };
       }
       const cutoff = result.t - (STRIP_WINDOW_SEC + 1);
       const s = samplesRef.current;
