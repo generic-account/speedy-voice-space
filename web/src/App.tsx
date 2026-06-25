@@ -3,7 +3,7 @@ import { C } from "./theme";
 import { AudioEngine, type AudioInputDevice } from "./audio/engine";
 import { LevelMeter } from "./components/LevelMeter";
 import { MainPlot, type TrailPoint } from "./components/MainPlot";
-import { FormantStrips } from "./components/FormantStrips";
+import { Strips } from "./components/Strips";
 import { Readouts } from "./components/Readouts";
 import { SettingsPanel, CORE_FIELDS, PITCH_FIELDS, FORMANT_FIELDS } from "./components/SettingsPanel";
 import { VoiceProcessor, type DisplayState } from "./processing/voiceProcessor";
@@ -266,7 +266,7 @@ export default function App() {
   const trailRef = useRef<TrailPoint[]>([]);
   // Timestamped formant samples (audio seconds) + an audio-clock anchor, so the
   // strips scroll on the clock and bursty arrival never lurches the line.
-  const samplesRef = useRef<{ t: number; f2: number; f3: number }[]>([]);
+  const samplesRef = useRef<{ t: number; f2: number; f3: number; pitch: number }[]>([]);
   const clockRef = useRef<{ audioT: number; wall: number }>({ audioT: 0, wall: 0 });
   const [trail, setTrail] = useState<TrailPoint[]>([]);
 
@@ -285,6 +285,7 @@ export default function App() {
         t: result.t,
         f2: state.filteredF2Hz ?? NaN,
         f3: state.filteredF3Hz ?? NaN,
+        pitch: state.filteredPitchHz ?? NaN,
       });
       // Phase-lock the wall-clock edge to the audio capture clock (they drift):
       // catch up fast when capture runs ahead, ease back slowly when it falls
@@ -306,7 +307,14 @@ export default function App() {
 
       const w = window as unknown as {
         __instrument?: boolean;
-        __resultLog?: { t: number; voiced: boolean; f2: number | null; f3: number | null }[];
+        __resultLog?: {
+          t: number;
+          voiced: boolean;
+          f2: number | null;
+          f3: number | null;
+          rawPitch: number | null;
+          pitch: number | null;
+        }[];
       };
       if (w.__instrument)
         (w.__resultLog ??= []).push({
@@ -314,6 +322,8 @@ export default function App() {
           voiced: state.voiced,
           f2: state.filteredF2Hz,
           f3: state.filteredF3Hz,
+          rawPitch: state.rawPitchHz,
+          pitch: state.filteredPitchHz,
         });
 
       if (state.filteredPitchHz !== null && state.filteredResonance !== null) {
@@ -340,7 +350,7 @@ export default function App() {
       setCtxState(s.ctxState);
       setDeviceLabel(s.deviceLabel);
       setTrail(trailRef.current);
-      // Strips render imperatively from samplesRef/clockRef (see FormantStrips).
+      // Strips render imperatively from samplesRef/clockRef (see Strips).
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -497,7 +507,7 @@ export default function App() {
             settings, which fills the space under the shorter readout box). */}
         <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
           <div style={{ flex: 2, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-            <FormantStrips samplesRef={samplesRef} clockRef={clockRef} windowSec={STRIP_WINDOW_SEC} />
+            <Strips samplesRef={samplesRef} clockRef={clockRef} windowSec={STRIP_WINDOW_SEC} />
             <div style={{ display: "flex", gap: 8, alignItems: "stretch", flex: 1 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <SettingsPanel
