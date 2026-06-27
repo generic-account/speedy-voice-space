@@ -12,7 +12,14 @@
 //! oracle in `tests/formant_parity.rs`.
 
 use aberth::aberth;
+use realfft::RealFftPlanner;
+use std::cell::RefCell;
 use std::f64::consts::PI;
+
+// Reused across blocks so FFT plans/twiddles are built once per size.
+thread_local! {
+    static FFT_PLANNER: RefCell<RealFftPlanner<f64>> = RefCell::new(RealFftPlanner::<f64>::new());
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormantParams {
@@ -58,16 +65,9 @@ pub struct FormantResult {
     pub bandwidths: Vec<f64>,
 }
 
-/// Fourier-domain resampler from `sr_in` to `sr_out`, equivalent to
-/// `scipy.signal.resample` (rFFT → spectral truncation → irFFT, scaled by
-/// `n_out/n_in`).
-///
-/// A Fourier resample (rather than a time-domain windowed sinc) is load-bearing
-/// for parity: the sinc leaves a ~1e-6 residual at the new Nyquist bin, and the
-/// ill-conditioned order-`2N` Burg on nasal vowels turns that into a spurious
-/// split pole. The Fourier resample yields a cleanly band-limited frame whose
-/// LPC lands on Praat's poles. A direct DFT is used (no FFT crate) — a single
-/// analysis frame is small, so the O(n_in · n_out/2) cost is modest and wasm-safe.
+/// Fourier resample (= `scipy.signal.resample`): rFFT → spectral truncation →
+/// irFFT, scaled by n_out/n_in. The clean band-limited frame is parity-critical —
+/// a windowed-sinc residual makes the order-2N Burg spawn spurious poles.
 fn resample(x: &[f64], sr_in: f64, sr_out: f64) -> Vec<f64> {
     if (sr_in - sr_out).abs() < 1e-6 {
         return x.to_vec();
@@ -78,51 +78,34 @@ fn resample(x: &[f64], sr_in: f64, sr_out: f64) -> Vec<f64> {
         return Vec::new();
     }
 
-    // Forward real DFT, keeping bins 0..=keep where keep is the new Nyquist
-    // index. Downsampling discards the high band (anti-aliasing); upsampling
-    // leaves the extra bins implicitly zero.
-    let keep = n_out / 2;
-    let n_bins = keep + 1;
-    let mut re = vec![0.0f64; n_bins];
-    let mut im = vec![0.0f64; n_bins];
-    let two_pi_over_n = 2.0 * PI / n_in as f64;
-    for (k, (rk, ik)) in re.iter_mut().zip(im.iter_mut()).enumerate() {
-        if k > n_in / 2 {
-            break; // bins beyond the input Nyquist are zero
-        }
-        let mut sr = 0.0;
-        let mut si = 0.0;
-        let wk = two_pi_over_n * k as f64;
-        for (n, &xn) in x.iter().enumerate() {
-            let ang = wk * n as f64;
-            sr += xn * ang.cos();
-            si -= xn * ang.sin();
-        }
-        *rk = sr;
-        *ik = si;
-    }
+    FFT_PLANNER.with(|planner| {
+        let mut planner = planner.borrow_mut();
+        let fwd = planner.plan_fft_forward(n_in);
+        let inv = planner.plan_fft_inverse(n_out);
 
-    // Inverse real DFT, scaled by n_out/n_in (scipy convention), reconstructed
-    // from the half spectrum via Hermitian symmetry: bin k and its mirror both
-    // contribute, so count each twice except DC and (for even n_out) Nyquist.
-    let scale = (n_out as f64 / n_in as f64) / n_in as f64;
-    let mut out = vec![0.0f64; n_out];
-    let two_pi_over_out = 2.0 * PI / n_out as f64;
-    for (m, om) in out.iter_mut().enumerate() {
-        let mut acc = re[0];
-        let base = two_pi_over_out * m as f64;
-        for k in 1..n_bins {
-            let ang = base * k as f64;
-            let term = re[k] * ang.cos() - im[k] * ang.sin();
-            if k == keep && n_out % 2 == 0 {
-                acc += term;
-            } else {
-                acc += 2.0 * term;
-            }
+        let mut input = fwd.make_input_vec();
+        input.copy_from_slice(x);
+        let mut spectrum = fwd.make_output_vec();
+        fwd.process(&mut input, &mut spectrum).expect("rfft");
+
+        // Keep the low n_out/2+1 bins; DC and Nyquist must be real.
+        let mut half = inv.make_input_vec();
+        let keep = half.len().min(spectrum.len());
+        half[..keep].copy_from_slice(&spectrum[..keep]);
+        half[0].im = 0.0;
+        if n_out % 2 == 0 {
+            let last = half.len() - 1;
+            half[last].im = 0.0;
         }
-        *om = acc * scale;
-    }
-    out
+
+        let mut out = inv.make_output_vec();
+        inv.process(&mut half, &mut out).expect("irfft");
+        let scale = (n_out as f64 / n_in as f64) / n_in as f64;
+        for v in out.iter_mut() {
+            *v *= scale;
+        }
+        out
+    })
 }
 
 /// Praat's Gaussian analysis window (see `Sound_to_Formant.cpp`):
@@ -787,5 +770,69 @@ mod tests {
     fn empty_on_short_frame() {
         let p = FormantParams::default();
         assert!(analyze_formants(&[0.0; 8], &p).formants.is_empty());
+    }
+
+    // Per-stage per-block timing (relative breakdown ~ wasm). Run:
+    //   cargo test --release profile_stages -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn profile_stages() {
+        use crate::pitch::{analyze_pitch, PitchParams};
+        use std::hint::black_box;
+        use std::time::Instant;
+
+        let sr = 48000.0;
+        let n = 2880; // 60 ms buffer, as in the app
+        let sig = synth_vowel(150.0, &[(700.0, 80.0), (1200.0, 90.0), (2600.0, 120.0)], sr, n);
+        let p = FormantParams { samplerate: sr, ..Default::default() };
+        let pp = PitchParams { samplerate: sr, ..Default::default() };
+        let order = 2 * p.max_number_of_formants;
+        let new_fs = resample_rate(&p);
+        let iters = 3000;
+
+        let mut timed = |label: &str, f: &mut dyn FnMut()| -> f64 {
+            for _ in 0..50 {
+                f();
+            }
+            let t = Instant::now();
+            for _ in 0..iters {
+                f();
+            }
+            let ms = t.elapsed().as_secs_f64() * 1000.0 / iters as f64;
+            println!("  {label:<26} {ms:.4} ms/frame");
+            ms
+        };
+
+        let pre = preprocess(&sig, &p);
+        let a_init = autocorrelation_lpc(&pre, order);
+        let (a, _, _) = analyze_lpc_robust(&sig, &p);
+        println!("[profile] n={n} -> resampled {} samples, order {order}", pre.len());
+        let resamp = timed("resample (FFT)", &mut || {
+            black_box(resample(&sig, sr, new_fs));
+        });
+        let prep = timed("preprocess (incl resample)", &mut || {
+            black_box(preprocess(&sig, &p));
+        });
+        let seed = timed("autocorr seed (Levinson)", &mut || {
+            black_box(autocorrelation_lpc(&pre, order));
+        });
+        let rlpc = timed("analyze_lpc_robust (full)", &mut || {
+            black_box(analyze_lpc_robust(&sig, &p));
+        });
+        let roots = timed("roots + extract", &mut || {
+            black_box(extract_formants(&a, order, new_fs, &p));
+        });
+        let formant = timed("FULL formant analyze", &mut || {
+            black_box(analyze_formants(&sig, &p));
+        });
+        let pitch = timed("FULL pitch analyze", &mut || {
+            black_box(analyze_pitch(&sig, &pp));
+        });
+        println!(
+            "[derived] window+dc+preemph={:.4}  IRLS(cov+solve)={:.4}  per-block(pitch+formant)={:.4} ms",
+            prep - resamp,
+            rlpc - prep - seed,
+            pitch + formant,
+        );
     }
 }

@@ -7,6 +7,29 @@
 //! candidate with no cross-frame Viterbi (the app median-filters f0 downstream).
 //! Validated against the Parselmouth oracle in `tests/pitch_parity.rs`.
 
+use std::cell::RefCell;
+
+// Window + its autocorrelation depend only on the analysis size, not the audio.
+thread_local! {
+    static PITCH_WINDOW: RefCell<Option<(usize, usize, Vec<f64>, Vec<f64>)>> =
+        const { RefCell::new(None) };
+}
+
+fn window_and_autocorr(nwin: usize, max_lag: usize) -> (Vec<f64>, Vec<f64>) {
+    PITCH_WINDOW.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some((cn, cm, w, acw)) = cache.as_ref() {
+            if *cn == nwin && *cm == max_lag {
+                return (w.clone(), acw.clone());
+            }
+        }
+        let w = hanning(nwin);
+        let acw = autocorr(&w, max_lag);
+        *cache = Some((nwin, max_lag, w.clone(), acw.clone()));
+        (w, acw)
+    })
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct PitchParams {
     pub samplerate: f64,
@@ -129,18 +152,17 @@ fn pitch_candidates(frame: &[f64], p: &PitchParams) -> Option<(Vec<(f64, f64)>, 
     }
     let uv = unvoiced_strength(p, local_peak, global_peak);
 
-    let w = hanning(nwin);
-    let windowed: Vec<f64> = centered.iter().zip(&w).map(|(a, b)| a * b).collect();
-
     let min_lag = (sr / p.ceiling).floor() as usize;
     let max_lag = ((sr / p.floor).ceil() as usize).min(nwin - 2);
     if max_lag <= min_lag || min_lag < 1 {
         return Some((Vec::new(), uv));
     }
 
+    let (w, acw) = window_and_autocorr(nwin, max_lag);
+    let windowed: Vec<f64> = centered.iter().zip(&w).map(|(a, b)| a * b).collect();
+
     // Window-normalized autocorrelation (Boersma): r = (acx/acx0) / (acw/acw0).
     let acx = autocorr(&windowed, max_lag);
-    let acw = autocorr(&w, max_lag);
     if acx[0] <= 0.0 || acw[0] <= 0.0 {
         return Some((Vec::new(), uv));
     }

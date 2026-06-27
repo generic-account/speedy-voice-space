@@ -62,6 +62,7 @@ dependencies = [
  "aberth",
  "hound",
  "nnnoiseless",
+ "realfft",
  "serde",
  "serde_json",
  "wasm-bindgen",
