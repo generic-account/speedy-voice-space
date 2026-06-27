@@ -128,6 +128,11 @@ fn resample(x: &[f64], sr_in: f64, sr_out: f64) -> Vec<f64> {
 /// Praat's Gaussian analysis window (see `Sound_to_Formant.cpp`):
 /// `w[i] = (exp(-48 (i/N - 0.5)^2) - edge) / (1 - edge)`,
 /// `edge = exp(-12)`. Length `n`.
+/// Post-resample sample rate: frames are resampled so Nyquist == the formant ceiling.
+fn resample_rate(p: &FormantParams) -> f64 {
+    2.0 * p.maximum_formant_hz
+}
+
 fn gaussian_window(n: usize) -> Vec<f64> {
     let edge = (-12.0_f64).exp();
     let mut w = vec![0.0; n];
@@ -539,7 +544,7 @@ fn robust_lpc(
 /// count.
 fn analyze_lpc_robust(frame: &[f64], p: &FormantParams) -> (Vec<f64>, f64, usize) {
     let order = 2 * p.max_number_of_formants;
-    let new_fs = 2.0 * p.maximum_formant_hz;
+    let new_fs = resample_rate(p);
     if frame.len() < 32 || order == 0 {
         return (vec![0.0; order + 1], new_fs, 0);
     }
@@ -574,7 +579,7 @@ fn analyze_lpc_robust(frame: &[f64], p: &FormantParams) -> (Vec<f64>, f64, usize
 /// us-vs-Praat LPC coefficient diagnostic (`tests/lpc_compare.rs`).
 pub fn analyze_lpc(frame: &[f64], p: &FormantParams) -> (Vec<f64>, f64) {
     let order = 2 * p.max_number_of_formants;
-    let new_fs = 2.0 * p.maximum_formant_hz;
+    let new_fs = resample_rate(p);
     if frame.len() < 32 || order == 0 {
         return (vec![0.0; order + 1], new_fs);
     }
@@ -595,7 +600,7 @@ pub fn analyze_lpc(frame: &[f64], p: &FormantParams) -> (Vec<f64>, f64) {
 /// and spawn spurious poles). `window_length_s` is kept for API compatibility.
 fn preprocess(frame: &[f64], p: &FormantParams) -> Vec<f64> {
     let sr_in = p.samplerate;
-    let new_fs = 2.0 * p.maximum_formant_hz;
+    let new_fs = resample_rate(p);
 
     let mut sig = resample(frame, sr_in, new_fs);
     if sig.len() < 16 {
@@ -622,27 +627,20 @@ fn preprocess(frame: &[f64], p: &FormantParams) -> Vec<f64> {
 }
 
 pub fn analyze_formants(frame: &[f64], p: &FormantParams) -> FormantResult {
+    if p.robust {
+        return analyze_formants_robust(frame, p);
+    }
+    // Burg path (kept for A/B and the Burg parity gate).
     let order = 2 * p.max_number_of_formants;
     let empty = FormantResult { formants: Vec::new(), bandwidths: Vec::new() };
-
     if frame.len() < 32 || order == 0 {
         return empty;
     }
-
-    let new_fs = 2.0 * p.maximum_formant_hz;
-
-    if p.robust {
-        let (a, fs, _iters) = analyze_lpc_robust(frame, p);
-        return extract_formants(&a, order, fs, p);
-    }
-
     let sig = preprocess(frame, p);
     if sig.len() <= order + 2 {
         return empty;
     }
-
-    let a = burg(&sig, order);
-    extract_formants(&a, order, new_fs, p)
+    extract_formants(&burg(&sig, order), order, resample_rate(p), p)
 }
 
 /// Robust formant extraction (Praat's IRLS/Huber LPC). Same signature as
@@ -660,17 +658,6 @@ pub fn analyze_formants_robust(frame: &[f64], p: &FormantParams) -> FormantResul
 /// Robust LPC iteration count for one frame (bounded-cost diagnostic).
 pub fn robust_iterations(frame: &[f64], p: &FormantParams) -> usize {
     analyze_lpc_robust(frame, p).2
-}
-
-/// Diagnostic: autocorrelation seed coefficients `a[1..=order]` on the
-/// preprocessed frame (for comparing against Praat's autocorrelation LPC).
-pub fn analyze_lpc_autocorr(frame: &[f64], p: &FormantParams) -> Vec<f64> {
-    let order = 2 * p.max_number_of_formants;
-    let sig = preprocess(frame, p);
-    if sig.len() <= order + 2 {
-        return vec![0.0; order + 1];
-    }
-    autocorrelation_lpc(&sig, order)
 }
 
 /// Solve for the LPC polynomial roots and convert to formants. Monomorphised per
@@ -704,11 +691,8 @@ fn extract_formants(a: &[f64], order: usize, fs: f64, p: &FormantParams) -> Form
         if r <= 0.0 {
             continue;
         }
-        let mut freq = zim.atan2(zre).abs() * fs / (2.0 * PI);
+        let freq = zim.atan2(zre).abs() * fs / (2.0 * PI);
         let bw = -r.ln() * fs / PI;
-        if freq <= 0.0 {
-            freq = 0.0;
-        }
         // Praat's acceptance test: keep poles in (safety, Nyquist - safety) with
         // safety = 50 Hz and NO upper bandwidth cap (it keeps wide damped poles,
         // e.g. nasal /a/ F3 ~1920 Hz, bw ~1445 Hz).

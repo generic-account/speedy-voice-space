@@ -60,8 +60,8 @@ impl PitchAnalyzer {
     }
 }
 
-/// Wasm handle around a configured formant analyzer (Praat Burg LPC). JS passes
-/// a mono `Float32Array` window; `analyze` returns F1..Fn (Hz, ascending).
+/// Wasm handle around a configured formant analyzer (Praat robust IRLS LPC). JS
+/// passes a mono `Float32Array` window; `analyze` returns F1..Fn (Hz, ascending).
 #[wasm_bindgen]
 pub struct FormantAnalyzer {
     params: formant::FormantParams,
@@ -94,14 +94,6 @@ impl FormantAnalyzer {
     #[wasm_bindgen(js_name = setPreEmphasisFrom)]
     pub fn set_pre_emphasis_from(&mut self, hz: f64) {
         self.params.pre_emphasis_from_hz = hz;
-    }
-
-    /// Toggle the robust (IRLS/Huber-reweighted) LPC path. On by default; clear
-    /// for the legacy Burg estimator (A/B). The worker keeps working unchanged —
-    /// `analyze`/`analyzeDetailed` honour this flag.
-    #[wasm_bindgen(js_name = setRobust)]
-    pub fn set_robust(&mut self, robust: bool) {
-        self.params.robust = robust;
     }
 
     /// Returns formant frequencies F1..Fn in Hz (ascending). Empty if the

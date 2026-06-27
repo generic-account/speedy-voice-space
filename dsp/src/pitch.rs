@@ -5,7 +5,7 @@
 //! lags up to sr/floor are needed, avoiding FFT normalization subtleties), the
 //! Boersma window-function autocorrelation correction, and a per-frame best
 //! candidate with no cross-frame Viterbi (the app median-filters f0 downstream).
-//! Validated against the Parselmouth oracle in `tests/parity.rs`.
+//! Validated against the Parselmouth oracle in `tests/pitch_parity.rs`.
 
 #[derive(Clone, Copy, Debug)]
 pub struct PitchParams {
@@ -171,22 +171,13 @@ fn pitch_candidates(frame: &[f64], p: &PitchParams) -> Option<(Vec<(f64, f64)>, 
 }
 
 /// Stateless per-frame pitch: the strongest candidate (no cross-frame memory).
+/// This is exactly the tracker's selection with no previous frame, where every
+/// transition cost is zero — so it reduces to "highest-strength candidate, if it
+/// beats the unvoiced option".
 pub fn analyze_pitch(frame: &[f64], p: &PitchParams) -> PitchResult {
-    let Some((cands, uv)) = pitch_candidates(frame, p) else {
-        return PitchResult { voiced: false, f0: None, strength: 0.0 };
-    };
-    let mut best_f = 0.0;
-    let mut best_strength = -1e9;
-    for &(f, s) in &cands {
-        if s > best_strength {
-            best_strength = s;
-            best_f = f;
-        }
-    }
-    if best_strength > uv && best_f > 0.0 {
-        PitchResult { voiced: true, f0: Some(best_f), strength: best_strength }
-    } else {
-        PitchResult { voiced: false, f0: None, strength: uv }
+    match pitch_candidates(frame, p) {
+        None => PitchResult { voiced: false, f0: None, strength: 0.0 },
+        Some((cands, uv)) => select_tracked(&cands, uv, Prev::None, p),
     }
 }
 
@@ -260,7 +251,6 @@ fn unvoiced_strength(p: &PitchParams, local_peak: f64, global_peak: f64) -> f64 
     let denom = p.silence_threshold / (1.0 + p.voicing_threshold);
     p.voicing_threshold + (2.0 - ratio / denom).max(0.0)
 }
-
 
 #[cfg(test)]
 mod tests {
