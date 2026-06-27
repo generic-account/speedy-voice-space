@@ -86,11 +86,6 @@ impl FormantAnalyzer {
         self.params.maximum_formant_hz = hz;
     }
 
-    #[wasm_bindgen(js_name = setWindowLength)]
-    pub fn set_window_length(&mut self, seconds: f64) {
-        self.params.window_length_s = seconds;
-    }
-
     #[wasm_bindgen(js_name = setPreEmphasisFrom)]
     pub fn set_pre_emphasis_from(&mut self, hz: f64) {
         self.params.pre_emphasis_from_hz = hz;

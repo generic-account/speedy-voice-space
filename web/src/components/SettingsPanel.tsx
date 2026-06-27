@@ -38,7 +38,7 @@ export const PITCH_FIELDS: Field[] = [
 export const FORMANT_FIELDS: Field[] = [
   { kind: "numA", key: "maxNumberOfFormants", label: "Max Formants", step: 0.5, tip: "How many formant peaks to find." },
   { kind: "numA", key: "maximumFormantHz", label: "Max Formant (Hz)", step: 100, tip: "Upper frequency bound for the search." },
-  { kind: "numA", key: "windowLengthS", label: "Window (s)", step: 0.001, tip: "Audio window length for formants." },
+  { kind: "numP", key: "stripWindowSec", label: "Strip Window (s)", step: 1, tip: "Seconds of F2/F3 and pitch history shown in the strips." },
   { kind: "numA", key: "preEmphasisFromHz", label: "Pre-emphasis (Hz)", step: 10, tip: "Boosts higher formants before analysis." },
   { kind: "numP", key: "formantMedianWindow", label: "Formant Median", step: 1, tip: "Median filter on displayed F2/F3." },
   { kind: "resonGrid" },

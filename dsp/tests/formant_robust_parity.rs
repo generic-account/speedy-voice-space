@@ -22,7 +22,6 @@ struct Oracle {
 struct Config {
     max_number_of_formants: f64,
     maximum_formant_hz: f64,
-    window_length_s: f64,
     pre_emphasis_from_hz: f64,
     rms_threshold: f64,
 }
@@ -67,7 +66,6 @@ fn params(o: &Oracle) -> FormantParams {
         samplerate: o.samplerate as f64,
         max_number_of_formants: o.config.max_number_of_formants as usize,
         maximum_formant_hz: o.config.maximum_formant_hz,
-        window_length_s: o.config.window_length_s,
         pre_emphasis_from_hz: o.config.pre_emphasis_from_hz,
         robust: true,
     }

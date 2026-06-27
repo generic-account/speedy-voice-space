@@ -33,7 +33,6 @@ struct Dump {
 struct Config {
     max_number_of_formants: f64,
     maximum_formant_hz: f64,
-    window_length_s: f64,
     pre_emphasis_from_hz: f64,
 }
 #[derive(Deserialize)]
@@ -69,7 +68,6 @@ fn compare_lpc() {
             samplerate: d.samplerate as f64,
             max_number_of_formants: d.config.max_number_of_formants as usize,
             maximum_formant_hz: d.config.maximum_formant_hz,
-            window_length_s: d.config.window_length_s,
             pre_emphasis_from_hz: d.config.pre_emphasis_from_hz,
             robust: false,
         };

@@ -32,7 +32,6 @@ function applyConfig(cfg: AnalysisConfig) {
   pitch?.resetTracking();
   formant?.setMaxNumberOfFormants(cfg.maxNumberOfFormants);
   formant?.setMaximumFormant(cfg.maximumFormantHz);
-  formant?.setWindowLength(cfg.windowLengthS);
   formant?.setPreEmphasisFrom(cfg.preEmphasisFromHz);
   denoiser?.reset();
   tracker.reset();

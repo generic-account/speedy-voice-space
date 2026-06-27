@@ -12,7 +12,6 @@ export interface AnalysisConfig {
   pitchVeryAccurate: boolean;
   maxNumberOfFormants: number;
   maximumFormantHz: number;
-  windowLengthS: number;
   preEmphasisFromHz: number;
   noiseSuppressionEnabled: boolean;
   noiseSuppressionMix: number;
@@ -25,6 +24,7 @@ export interface ProcessingSettings {
   resonanceMedianWindow: number;
   // Causal median on the DISPLAYED formants only (display, not the score).
   formantMedianWindow: number;
+  stripWindowSec: number; // seconds of history shown in the F2/F3/pitch strips
   // EMA smoothing amount in [0,1): higher = smoother + laggier (alpha = 1 - this).
   pitchSmoothing: number;
   resonanceSmoothing: number;
@@ -55,7 +55,6 @@ export function defaultAnalysisConfig(): AnalysisConfig {
     pitchVeryAccurate: false,
     maxNumberOfFormants: 5,
     maximumFormantHz: 5500,
-    windowLengthS: 0.025,
     preEmphasisFromHz: 50,
     noiseSuppressionEnabled: false,
     noiseSuppressionMix: 0.05,
@@ -68,6 +67,7 @@ export function defaultProcessingSettings(): ProcessingSettings {
     pitchMedianWindow: 5,
     resonanceMedianWindow: 7,
     formantMedianWindow: 3,
+    stripWindowSec: 10,
     pitchSmoothing: 0.75,
     resonanceSmoothing: 0.85,
     f2LowHz: 600,

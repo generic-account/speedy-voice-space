@@ -15,7 +15,6 @@ import {
 } from "./processing/defaults";
 
 const TRAIL_LEN = 120;
-const STRIP_WINDOW_SEC = 10; // formant strips show the last N seconds (clock-driven)
 
 const ABOUT_CARD: React.CSSProperties = {
   background: C.surface,
@@ -268,6 +267,9 @@ export default function App() {
   // strips scroll on the clock and bursty arrival never lurches the line.
   const samplesRef = useRef<{ t: number; f2: number; f3: number; pitch: number }[]>([]);
   const clockRef = useRef<{ audioT: number; wall: number }>({ audioT: 0, wall: 0 });
+  // Live strip-window seconds for the onResult closure (which captures once).
+  const stripWindowRef = useRef(procCfg.stripWindowSec);
+  stripWindowRef.current = procCfg.stripWindowSec;
   const [trail, setTrail] = useState<TrailPoint[]>([]);
 
   // Wire engine results → processor → display state (+ test hook).
@@ -299,7 +301,7 @@ export default function App() {
         const nudge = ahead > 0 ? Math.min(ahead, 0.05) : Math.max(ahead, -0.003);
         clockRef.current = { audioT: c.audioT + nudge, wall: c.wall };
       }
-      const cutoff = result.t - (STRIP_WINDOW_SEC + 1);
+      const cutoff = result.t - (stripWindowRef.current + 1);
       const s = samplesRef.current;
       let drop = 0;
       while (drop < s.length && s[drop].t < cutoff) drop++;
@@ -507,7 +509,7 @@ export default function App() {
             settings, which fills the space under the shorter readout box). */}
         <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
           <div style={{ flex: 2, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-            <Strips samplesRef={samplesRef} clockRef={clockRef} windowSec={STRIP_WINDOW_SEC} />
+            <Strips samplesRef={samplesRef} clockRef={clockRef} windowSec={Math.max(1, procCfg.stripWindowSec)} />
             <div style={{ display: "flex", gap: 8, alignItems: "stretch", flex: 1 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <SettingsPanel

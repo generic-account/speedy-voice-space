@@ -28,8 +28,6 @@ pub struct FormantParams {
     pub max_number_of_formants: usize,
     /// Formant ceiling (Hz). The window is resampled so Nyquist == this.
     pub maximum_formant_hz: f64,
-    /// Effective analysis window length (s). Praat's "Gaussian" window.
-    pub window_length_s: f64,
     /// Pre-emphasis corner frequency (Hz).
     pub pre_emphasis_from_hz: f64,
     /// Use Praat's robust (IRLS / Huber-reweighted) LPC instead of plain Burg.
@@ -44,7 +42,6 @@ impl Default for FormantParams {
             samplerate: 48000.0,
             max_number_of_formants: 5,
             maximum_formant_hz: 5500.0,
-            window_length_s: 0.025,
             pre_emphasis_from_hz: 50.0,
             robust: true,
         }
@@ -576,11 +573,9 @@ pub fn analyze_lpc(frame: &[f64], p: &FormantParams) -> (Vec<f64>, f64) {
 /// Resample to `2*maxformant` → DC removal → pre-emphasis → Gaussian window,
 /// returning the windowed signal ready for Burg.
 ///
-/// The window spans the **whole resampled frame**, not a `window_length`
-/// sub-window: the caller hands us one analysis buffer per estimate, and the
-/// full frame both matches the oracle at the buffer midpoint and conditions the
-/// order-`2N` Burg far better (short windows make nasal formants ill-conditioned
-/// and spawn spurious poles). `window_length_s` is kept for API compatibility.
+/// The window spans the whole per-call buffer (not a sub-window): the full frame
+/// matches the oracle at the buffer midpoint and conditions the order-2N Burg far
+/// better — short windows make nasal formants ill-conditioned and spawn spurious poles.
 fn preprocess(frame: &[f64], p: &FormantParams) -> Vec<f64> {
     let sr_in = p.samplerate;
     let new_fs = resample_rate(p);
