@@ -7,12 +7,36 @@
 //! candidate with no cross-frame Viterbi (the app median-filters f0 downstream).
 //! Validated against the Parselmouth oracle in `tests/pitch_parity.rs`.
 
+use realfft::{num_complex::Complex, RealFftPlanner};
 use std::cell::RefCell;
 
 // Window + its autocorrelation depend only on the analysis size, not the audio.
 thread_local! {
     static PITCH_WINDOW: RefCell<Option<(usize, usize, Vec<f64>, Vec<f64>)>> =
         const { RefCell::new(None) };
+    static PITCH_FFT: RefCell<RealFftPlanner<f64>> = RefCell::new(RealFftPlanner::<f64>::new());
+}
+
+// Linear autocorrelation for lags 0..=max_lag via FFT (Praat's method),
+// zero-padded to avoid wraparound. Scale is irrelevant — `r` normalizes by acx[0].
+fn autocorr_fft(x: &[f64], max_lag: usize) -> Vec<f64> {
+    let l = (x.len() + max_lag).next_power_of_two();
+    PITCH_FFT.with(|planner| {
+        let mut planner = planner.borrow_mut();
+        let fwd = planner.plan_fft_forward(l);
+        let inv = planner.plan_fft_inverse(l);
+        let mut buf = fwd.make_input_vec();
+        buf[..x.len()].copy_from_slice(x);
+        let mut spec = fwd.make_output_vec();
+        fwd.process(&mut buf, &mut spec).expect("rfft");
+        for c in spec.iter_mut() {
+            *c = Complex::new(c.norm_sqr(), 0.0);
+        }
+        let mut out = inv.make_output_vec();
+        inv.process(&mut spec, &mut out).expect("irfft");
+        out.truncate(max_lag + 1);
+        out
+    })
 }
 
 fn window_and_autocorr(nwin: usize, max_lag: usize) -> (Vec<f64>, Vec<f64>) {
@@ -162,7 +186,7 @@ fn pitch_candidates(frame: &[f64], p: &PitchParams) -> Option<(Vec<(f64, f64)>, 
     let windowed: Vec<f64> = centered.iter().zip(&w).map(|(a, b)| a * b).collect();
 
     // Window-normalized autocorrelation (Boersma): r = (acx/acx0) / (acw/acw0).
-    let acx = autocorr(&windowed, max_lag);
+    let acx = autocorr_fft(&windowed, max_lag);
     if acx[0] <= 0.0 || acw[0] <= 0.0 {
         return Some((Vec::new(), uv));
     }
