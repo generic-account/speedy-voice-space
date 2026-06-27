@@ -14,7 +14,6 @@ pub struct Denoiser {
     state: Box<DenoiseState<'static>>,
     in_buf: Vec<f32>,
     out_buf: Vec<f32>,
-    last_vad: f32,
 }
 
 impl Denoiser {
@@ -23,7 +22,6 @@ impl Denoiser {
             state: DenoiseState::new(),
             in_buf: Vec::new(),
             out_buf: Vec::new(),
-            last_vad: 0.0,
         }
     }
 
@@ -31,11 +29,6 @@ impl Denoiser {
         self.state = DenoiseState::new();
         self.in_buf.clear();
         self.out_buf.clear();
-        self.last_vad = 0.0;
-    }
-
-    pub fn last_speech_prob(&self) -> f32 {
-        self.last_vad
     }
 
     /// Process one block, returning the same number of samples. `mix` in [0,1]
@@ -53,7 +46,7 @@ impl Denoiser {
             for i in 0..FRAME {
                 frame_in[i] = raw[i] * SCALE;
             }
-            self.last_vad = self.state.process_frame(&mut frame_out, &frame_in);
+            self.state.process_frame(&mut frame_out, &frame_in);
             for i in 0..FRAME {
                 let denoised = frame_out[i] / SCALE;
                 self.out_buf.push(mix * denoised + (1.0 - mix) * raw[i]);

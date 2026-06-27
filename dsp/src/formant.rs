@@ -828,11 +828,16 @@ mod tests {
         let pitch = timed("FULL pitch analyze", &mut || {
             black_box(analyze_pitch(&sig, &pp));
         });
+        let block: Vec<f32> = sig[..1024].iter().map(|&v| v as f32).collect();
+        let mut den = crate::denoise::Denoiser::new();
+        let denoise = timed("denoise 1024-block (off by default)", &mut || {
+            black_box(den.process_block(&block, 1.0));
+        });
         println!(
-            "[derived] window+dc+preemph={:.4}  IRLS(cov+solve)={:.4}  per-block(pitch+formant)={:.4} ms",
-            prep - resamp,
-            rlpc - prep - seed,
+            "[derived] per-block(pitch+formant)={:.4} ms  denoise/sec={:.2} ms (x{:.0} realtime headroom)",
             pitch + formant,
+            denoise * 48000.0 / 1024.0,
+            1000.0 / (denoise * 48000.0 / 1024.0),
         );
     }
 }

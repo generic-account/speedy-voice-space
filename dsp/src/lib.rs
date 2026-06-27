@@ -142,11 +142,6 @@ impl Denoiser {
     pub fn process(&mut self, block: &[f32], mix: f64) -> Vec<f32> {
         self.inner.process_block(block, mix as f32)
     }
-
-    #[wasm_bindgen(js_name = lastSpeechProb)]
-    pub fn last_speech_prob(&self) -> f64 {
-        self.inner.last_speech_prob() as f64
-    }
 }
 
 impl Default for Denoiser {
